@@ -233,17 +233,13 @@ id=ExampleMod
 "@
 
 Invoke-Checked -Name "repair workshop rejects unsafe item id" -Script {
-    . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
-    function Assert-WorkshopItemIdSafeForTest {
-        param([Parameter(Mandatory=$true)][string]$Value)
-        if ($Value -notmatch '^\d+$') { throw "Workshop ItemId must contain digits only." }
-    }
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
     try {
-        Assert-WorkshopItemIdSafeForTest -Value "..\123"
-        "not rejected"
+        $output = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-repair-workshop-redownload.ps1") -ZomboidRoot $zRoot -WorkshopRoot $workshopRoot -BackupRoot $backupRoot -ItemId "..\123" -WhatIf 2>&1 | Out-String
+        "exit=$LASTEXITCODE`n$output"
     }
     catch {
-        $_.Exception.Message
+        "caught=$($_.Exception.Message)"
     }
 } -Assert { param($text) $text -match "digits only" }
 
