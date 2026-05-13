@@ -1,0 +1,17 @@
+backups/
+exports/
+logs/
+tmp/
+*.tmp
+*.local.*
+examples/exports/
+examples/*.local.*
+tests/tmp/
+docs/private/
+docs/*.private.md
+docs/*local*.md
+publish-notes-local.md
+*.zip
+*.7z
+*.db
+*.sqlite
