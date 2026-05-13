@@ -144,18 +144,81 @@ function Get-PZTPaths {
 function Get-PZTGameProcesses {
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.Name -match "ProjectZomboid|ZombieBuddy|java|javaw|zulu" -or
-            $_.CommandLine -match "ProjectZomboid|ZombieBuddy|ZModUnbork|PeekAView|ZBBetterFPS|Staircast"
+            $_.Name -match "ProjectZomboid|ZombieBuddy" -or
+            (($_.Name -match "java|javaw|zulu") -and ($_.CommandLine -match "ProjectZomboid|ZombieBuddy|ZModUnbork|PeekAView|ZBBetterFPS|Staircast"))
         } |
         Where-Object { $_.ProcessId -ne $PID }
+}
+
+function Format-PZTProcessCommandLine {
+    param([AllowNull()][string]$CommandLine)
+    if (-not $CommandLine) { return "" }
+    $value = $CommandLine
+    if ($env:USERPROFILE) { $value = $value.Replace($env:USERPROFILE, "%USERPROFILE%") }
+    if ($value.Length -gt 220) { $value = $value.Substring(0, 220) + "..." }
+    return $value
 }
 
 function Assert-PZTNoGameProcesses {
     $procs = Get-PZTGameProcesses
     if ($procs) {
-        $procs | Select-Object ProcessId, Name, CommandLine | Format-List
+        $procs | Select-Object ProcessId, Name, @{Name="CommandLine";Expression={ Format-PZTProcessCommandLine -CommandLine $_.CommandLine }} | Format-List
         throw "Project Zomboid, ZombieBuddy, or Java-related processes are running. Close the game before modifying files."
     }
+}
+
+function Assert-PZTProfileNameSafe {
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$ProfileName,
+        [string]$ParamName = "ProfileName"
+    )
+
+    if ($ProfileName -ne $ProfileName.Trim()) { throw "$ParamName has leading or trailing whitespace." }
+    if (-not $ProfileName) { throw "$ParamName cannot be empty." }
+    if ($ProfileName -eq "." -or $ProfileName -eq ".." -or $ProfileName.Contains("..")) { throw "$ParamName cannot contain '..'." }
+    if ($ProfileName -match '[\\/:\*\?"<>\|]') { throw "$ParamName contains characters that are not safe for hosted profile filenames." }
+    if ($ProfileName -match '[\x00-\x1F]') { throw "$ParamName contains control characters." }
+
+    $reserved = @("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
+    if ($reserved -contains $ProfileName.ToUpperInvariant()) { throw "$ParamName uses a reserved Windows filename." }
+}
+
+function Get-PZTFullPath {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    return [System.IO.Path]::GetFullPath($Path)
+}
+
+function Assert-PZTPathInside {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$Parent,
+        [string]$Description = "path"
+    )
+
+    $fullPath = Get-PZTFullPath -Path $Path
+    $fullParent = Get-PZTFullPath -Path $Parent
+    $parentWithSeparator = $fullParent.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not ($fullPath.Equals($fullParent, [System.StringComparison]::OrdinalIgnoreCase) -or $fullPath.StartsWith($parentWithSeparator, [System.StringComparison]::OrdinalIgnoreCase))) {
+        throw "Refusing unsafe $Description outside expected root. Path='$fullPath' Root='$fullParent'"
+    }
+    return $fullPath
+}
+
+function Assert-PZTProfilePathsContained {
+    param(
+        [Parameter(Mandatory=$true)]$Paths,
+        [Parameter(Mandatory=$true)][string]$ProfileName
+    )
+
+    Assert-PZTProfileNameSafe -ProfileName $ProfileName
+    foreach ($file in Get-PZTProfileFilePaths -ServerDir $Paths.ServerDir -ProfileName $ProfileName) {
+        Assert-PZTPathInside -Path $file -Parent $Paths.ServerDir -Description "server profile file" | Out-Null
+    }
+    $saveName = Convert-PZTProfileNameToSaveName -ProfileName $ProfileName
+    Assert-PZTProfileNameSafe -ProfileName $saveName -ParamName "SaveName"
+    Assert-PZTPathInside -Path (Join-Path $Paths.SavesDir $saveName) -Parent $Paths.SavesDir -Description "save folder" | Out-Null
+    Assert-PZTPathInside -Path (Join-Path $Paths.SavesDir "${saveName}_player") -Parent $Paths.SavesDir -Description "player folder" | Out-Null
+    Assert-PZTPathInside -Path (Join-Path $Paths.DbDir "$ProfileName.db") -Parent $Paths.DbDir -Description "profile database" | Out-Null
 }
 
 function New-PZTBackupDir {
@@ -263,14 +326,39 @@ function Invoke-PZTPython {
     }
 }
 
+function Invoke-PZTPythonJson {
+    param(
+        [Parameter(Mandatory=$true)][string]$Code,
+        [Parameter(Mandatory=$true)]$InputObject
+    )
+
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $python) { $python = Get-Command py -ErrorAction SilentlyContinue }
+    if (-not $python) { throw "Python was not found in PATH. SQLite operations require Python." }
+
+    $tmpCode = Join-Path $env:TEMP ("pz-toolkit-{0}.py" -f ([guid]::NewGuid().ToString("N")))
+    $tmpJson = Join-Path $env:TEMP ("pz-toolkit-{0}.json" -f ([guid]::NewGuid().ToString("N")))
+    try {
+        Set-PZTTextNoBom -Path $tmpCode -Content $Code
+        Set-PZTTextNoBom -Path $tmpJson -Content ($InputObject | ConvertTo-Json -Depth 10)
+        & $python.Source $tmpCode $tmpJson
+        if ($LASTEXITCODE -ne 0) { throw "Python exited with code $LASTEXITCODE." }
+    }
+    finally {
+        if (Test-Path -LiteralPath $tmpCode) { Remove-Item -LiteralPath $tmpCode -Force }
+        if (Test-Path -LiteralPath $tmpJson) { Remove-Item -LiteralPath $tmpJson -Force }
+    }
+}
+
 function Get-PZTPlayersInfo {
     param([Parameter(Mandatory=$true)][string]$PlayersDb)
 
     if (-not (Test-Path -LiteralPath $PlayersDb)) { return @() }
-    $dbLiteral = $PlayersDb.Replace("\", "\\").Replace("'", "''")
     $code = @"
-import json, sqlite3
-db = r'$dbLiteral'
+import json, sqlite3, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    args = json.load(f)
+db = args["db"]
 con = sqlite3.connect(db)
 con.row_factory = sqlite3.Row
 cur = con.cursor()
@@ -296,7 +384,7 @@ for row in rows:
 con.close()
 "@
 
-    $raw = Invoke-PZTPython -Code $code
+    $raw = Invoke-PZTPythonJson -Code $code -InputObject @{ db = $PlayersDb }
     if (-not $raw) { return @() }
     return @($raw | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json })
 }
@@ -480,6 +568,14 @@ function Get-PZTBackupDirectories {
     return @(Get-ChildItem -LiteralPath $BackupRoot -Directory -Force |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First $Limit)
+}
+
+function Test-PZTBackupComplete {
+    param([Parameter(Mandatory=$true)][string]$BackupPath)
+    $statusPath = Join-Path $BackupPath "BACKUP_STATUS.txt"
+    if (-not (Test-Path -LiteralPath $statusPath)) { return $false }
+    $firstLine = Get-Content -LiteralPath $statusPath -First 1 -ErrorAction SilentlyContinue
+    return ($firstLine -eq "COMPLETE")
 }
 
 function Get-PZTProfileHealth {

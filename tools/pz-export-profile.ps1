@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 Write-PZTTitle "PZ Hosted Toolkit - Export Profile" "pz-export-profile"
 
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -WorkshopRoot $WorkshopRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
 $lang = Get-PZTLanguage
 $ini = Join-Path $paths.ServerDir "$ProfileName.ini"
 if (-not (Test-Path -LiteralPath $ini)) { throw "Profile INI not found: $ini" }

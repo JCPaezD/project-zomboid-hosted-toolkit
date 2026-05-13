@@ -59,6 +59,8 @@ Most write-capable scripts support `-WhatIf`, create a backup, ask for confirmat
 
 The toolkit is plain PowerShell: no opaque executable, no Steam login, and no automatic upload of your files.
 
+The `.cmd` wrappers use PowerShell's `-ExecutionPolicy Bypass` only for that local process. This avoids changing your global Windows execution policy; it does not grant administrator rights or download code. You can always run `.\pz-toolkit.ps1` directly from PowerShell instead.
+
 ## Requirements
 
 - Windows PowerShell 5.1 or newer.
@@ -160,7 +162,7 @@ Restore a profile backup, or copy it into a new hosted profile:
 .\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -TargetProfileName "MyHostedServer_Copy" -WhatIf
 ```
 
-When copying to a new profile name, the restore tool renames the server files, save folder, optional `_player` folder, profile database, and `players.db` world rows. If `PublicName` exactly matches the source profile name, it is updated too.
+When copying to a new profile name, the restore tool renames the server files, save folder, optional `_player` folder, profile database, and `players.db` world rows. If `PublicName` exactly matches the source profile name, it is updated too. Real restore operations require `-ConfirmRestore` after you review `-WhatIf` output.
 
 Find recent known error patterns:
 
@@ -201,14 +203,14 @@ Reset one hosted player:
 
 ```powershell
 .\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0 -WhatIf
-.\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0
+.\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0 -ConfirmReset
 ```
 
 Reset the world/save data for a selected hosted profile while keeping the server profile:
 
 ```powershell
 .\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer" -WhatIf
-.\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer"
+.\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer" -ConfirmReset
 ```
 
 Repair a specific Workshop redownload/cache case:
@@ -246,6 +248,15 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | `tools/pz-copy-players.ps1` | Copy hosted player rows and optional `_player` folder from one profile to another. |
 | `tools/pz-find-latest-error.ps1` | Search latest PZ logs for common failure patterns. |
 | `tools/pz-repair-workshop-redownload.ps1` | Conservative repair for `Installed|NeedsUpdate` plus prepared Workshop download cache. |
+
+## Safety Levels
+
+| Area | Default behavior |
+| --- | --- |
+| Diagnosis and inspection | Read-only. |
+| Backup and export | Writes only under toolkit `backups\` or `exports\` unless an explicit path is provided. |
+| Restore/copy/reset | Supports `-WhatIf`; real direct-script operations require explicit confirmation flags such as `-ConfirmRestore`, `-ConfirmCopy`, or `-ConfirmReset`. |
+| Workshop repair | Narrow repair only; use `-WhatIf` first and close PZ/Steam helper processes before writing. |
 
 ## Testing
 
@@ -294,6 +305,8 @@ Helpful issue reports include:
 - Whether Project Zomboid, Steam, Java, or mod helper tools were open.
 
 Please remove private data before posting logs or exports: usernames, Steam IDs, private paths, server names, IPs, and personal save data.
+
+See [docs/privacy.md](docs/privacy.md) for a short redaction checklist.
 
 ## Important Caveats
 

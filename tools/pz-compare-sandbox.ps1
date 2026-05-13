@@ -67,6 +67,8 @@ if (-not $LeftProfile -or -not $RightProfile) {
 
 $leftPath = Join-Path $paths.ServerDir "${LeftProfile}_SandboxVars.lua"
 $rightPath = Join-Path $paths.ServerDir "${RightProfile}_SandboxVars.lua"
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $LeftProfile
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $RightProfile
 
 $left = Read-SandboxVars -Path $leftPath
 $right = Read-SandboxVars -Path $rightPath

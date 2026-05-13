@@ -12,6 +12,8 @@ scripts\toolkit.cmd
 
 Use the arrow keys to move, Enter to run the selected action, and `Q` to quit.
 
+The `.cmd` wrappers use PowerShell's `-ExecutionPolicy Bypass` only for that one local process. This avoids changing your Windows execution policy globally. If you prefer, open PowerShell in the toolkit folder and run `.\pz-toolkit.ps1` directly.
+
 ## 2. Run a read-only diagnosis first
 
 Choose:
@@ -66,4 +68,3 @@ Read-only inspection tools can run while the game is closed or open, but logs an
 ## 7. When in doubt
 
 Do not manually delete save chunks, profile databases, or player rows from a valuable save. Create a copied profile first and test there.
-

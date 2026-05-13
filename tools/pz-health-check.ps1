@@ -14,6 +14,7 @@ if (-not $ProfileName) {
     $ProfileName = Read-PZTMenuChoice -Prompt (Get-PZTText "Choose hosted profile to health-check" "Elige perfil hosted para comprobar salud") -Items (Get-PZTHostedProfileNames -ServerDir $paths.ServerDir) -AllowCancel
     if (-not $ProfileName) { exit 0 }
 }
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
 
 $health = Get-PZTProfileHealth -Paths $paths -ProfileName $ProfileName
 

@@ -64,6 +64,7 @@ else {
 $cutoff = (Get-Date).AddDays(-1 * $RecentDays)
 $entries = New-Object System.Collections.Generic.List[object]
 foreach ($profile in $profiles) {
+    Assert-PZTProfilePathsContained -Paths $paths -ProfileName $profile
     $saveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $profile
     $savePath = Join-Path $paths.SavesDir $saveName
     if (Test-Path -LiteralPath $savePath) {

@@ -27,6 +27,7 @@ This document defines the intended scope, safety model, and design boundaries fo
 
 - Prefer read-only diagnosis before repair.
 - Prefer `-WhatIf` before write operations.
+- Require explicit confirmation flags for direct-script restore/copy/reset operations.
 - Create backups before destructive or hard-to-reverse changes.
 - Touch the smallest possible file set.
 - Refuse or warn when Project Zomboid, Java, ZombieBuddy, or related processes may be using files.
@@ -46,6 +47,8 @@ This document defines the intended scope, safety model, and design boundaries fo
 - Sandbox comparison favors readability by summarizing sections that only exist in one profile. Full detail is still available through flags or CSV export.
 - Backup manifests list file sizes by default for speed. SHA256 hashes are optional through `-HashManifest` because large PZ saves can contain many thousands of files.
 - MIT is the default license for public reuse.
+- Profile names are validated before path construction. Names with path separators, `..`, control characters, or unsafe Windows filename characters are rejected.
+- SQLite helper scripts receive paths and names through temporary JSON input instead of interpolating user-controlled values into Python code.
 
 ## Known Limitations
 

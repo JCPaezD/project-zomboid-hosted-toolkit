@@ -37,7 +37,7 @@ If a hosted profile has been used only for testing and you want the next launch 
 
 ```powershell
 .\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer" -WhatIf
-.\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer"
+.\pz-toolkit.ps1 reset-world -ProfileName "MyHostedServer" -ConfirmReset
 ```
 
 This moves the save folder, optional `_player` folder, and optional `db\<profile>.db` into a timestamped backup. It does not modify `Server\<profile>.*`.
@@ -61,6 +61,17 @@ To copy a backup into a new profile name:
 If the target already exists, the restore refuses to continue unless `-Overwrite` is passed. When `-Overwrite` is used, the current target is backed up first.
 
 When copying to a new profile name, `restore-profile` renames the restored server files, save folder, optional `_player` folder, profile database, and hosted player `world` rows in `players.db`. It also updates `PublicName` when the old value exactly matches the source profile name.
+
+Real direct-script restore/copy/reset operations require explicit confirmation flags after you review `-WhatIf` output:
+
+```powershell
+.\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -TargetProfileName "MyHostedServer_Copy" -ConfirmRestore
+.\pz-toolkit.ps1 copy-world -SourceProfileName "SourceProfile" -TargetProfileName "TargetProfile" -Overwrite -ConfirmCopy
+.\pz-toolkit.ps1 copy-players -SourceProfileName "SourceProfile" -TargetProfileName "TargetProfile" -Overwrite -ConfirmCopy
+.\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0 -ConfirmReset
+```
+
+`restore-profile` refuses to restore backups whose `BACKUP_STATUS.txt` is not `COMPLETE`, unless you add `-AllowIncompleteBackup` for a deliberate manual rescue.
 
 ## Encoding Safety
 

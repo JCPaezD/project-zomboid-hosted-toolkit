@@ -286,11 +286,32 @@ Invoke-Checked -Name "backup and restore profile as copy" -Script {
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
     $status = Get-Content -LiteralPath (Join-Path $backup.FullName "BACKUP_STATUS.txt") -First 1
-    & (Join-Path $root "tools\pz-restore-profile.ps1") -BackupPath $backup.FullName -TargetProfileName "RestoredProfile" -ZomboidRoot $zRoot -BackupRoot $backupRoot
+    & (Join-Path $root "tools\pz-restore-profile.ps1") -BackupPath $backup.FullName -TargetProfileName "RestoredProfile" -ZomboidRoot $zRoot -BackupRoot $backupRoot -ConfirmRestore
     "Status: $status"
     Select-String -LiteralPath (Join-Path $serverDir "RestoredProfile.ini") -Pattern "PublicName=RestoredProfile" -SimpleMatch
     Test-Path -LiteralPath (Join-Path $serverDir "RestoredProfile.ini")
 } -Assert { param($text) $text -match "Status: COMPLETE" -and $text -match "PublicName=RestoredProfile" -and $text -match "True" }
+
+Invoke-Checked -Name "restore refuses incomplete backup by default" -Script {
+    $backup = Get-ChildItem -LiteralPath $backupRoot -Directory -Filter "profile-$profile-*" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    Set-TestText -Path (Join-Path $backup.FullName "BACKUP_STATUS.txt") -Content "INCOMPLETE`nFixture"
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-restore-profile.ps1") -BackupPath $backup.FullName -TargetProfileName "ShouldNotRestore" -ZomboidRoot $zRoot -BackupRoot $backupRoot -ConfirmRestore 2>&1
+    Set-TestText -Path (Join-Path $backup.FullName "BACKUP_STATUS.txt") -Content "COMPLETE`nFixture restored"
+} -Assert { param($text) $text -match "not COMPLETE" -and -not (Test-Path -LiteralPath (Join-Path $serverDir "ShouldNotRestore.ini")) }
+
+Invoke-Checked -Name "unsafe profile names are rejected" -Script {
+    . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
+    try {
+        Assert-PZTProfileNameSafe -ProfileName "..\BadProfile"
+        "not rejected"
+    }
+    catch {
+        $_.Exception.Message
+    }
+} -Assert { param($text) $text -match "not safe|cannot contain|characters|ProfileName" }
 
 Invoke-Checked -Name "verify backup reports complete status" -Script {
     $backup = Get-ChildItem -LiteralPath $backupRoot -Directory -Filter "profile-$profile-*" |

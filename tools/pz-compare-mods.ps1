@@ -15,6 +15,8 @@ $ErrorActionPreference = "Stop"
 if (-not $Json) { Write-PZTTitle "PZ Hosted Toolkit - Compare Profile Mods" "pz-compare-mods" }
 
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -WorkshopRoot $WorkshopRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $LeftProfile
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $RightProfile
 $leftIni = Join-Path $paths.ServerDir "$LeftProfile.ini"
 $rightIni = Join-Path $paths.ServerDir "$RightProfile.ini"
 if (-not (Test-Path -LiteralPath $leftIni)) { throw "Left profile INI not found: $leftIni" }

@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a toolkit problem or confusing result.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve PZ Hosted Toolkit. Please remove private data before posting logs or exports.
+  - type: input
+    id: pz-version
+    attributes:
+      label: Project Zomboid version/build
+      placeholder: "Build 42.x"
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows / PowerShell version
+      placeholder: "Windows 11, PowerShell 5.1"
+  - type: dropdown
+    id: setup
+    attributes:
+      label: Server setup
+      options:
+        - In-game Host / co-op
+        - Dedicated server
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or TUI action
+      description: Include whether you used WhatIf/dry-run.
+      render: powershell
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant toolkit output or log excerpt
+      description: Redact usernames, Steam IDs, private paths, IPs, and server names.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I reviewed the output for private paths, usernames, Steam IDs, IPs, and save data.
+          required: true

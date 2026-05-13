@@ -98,6 +98,12 @@ Use:
 .\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0 -WhatIf
 ```
 
+Only run the real reset after reviewing the preview:
+
+```powershell
+.\pz-toolkit.ps1 reset-player -ProfileName "MyHostedServer" -Username "SteamName" -PlayerIndex 0 -ConfirmReset
+```
+
 ## RV / Camper Interior Sends Player to Woods
 
 Likely cause: the mod is loaded, but the required interior map directories are missing from `Map=`.

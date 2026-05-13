@@ -5,6 +5,7 @@ param(
     [string]$BackupRoot,
     [switch]$IncludePlayerFolder = $true,
     [switch]$Overwrite,
+    [switch]$ConfirmCopy,
     [switch]$WhatIf
 )
 
@@ -15,6 +16,8 @@ Write-PZTTitle "PZ Hosted Toolkit - Copy Players" "pz-copy-players"
 Assert-PZTNoGameProcesses
 
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -BackupRoot $BackupRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $SourceProfileName
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $TargetProfileName
 $sourceSaveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $SourceProfileName
 $targetSaveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $TargetProfileName
 $sourceSaveDir = Join-Path $paths.SavesDir $sourceSaveName
@@ -52,6 +55,10 @@ if ($WhatIf) {
     else { Write-PZTStep "WhatIf: no player database or _player folder will be copied." "pz-copy-players" }
     exit 0
 }
+if (-not $ConfirmCopy) {
+    Write-PZTStep "Refusing real player copy without -ConfirmCopy. Run with -WhatIf first, then add -ConfirmCopy when source and target are correct." "pz-copy-players"
+    exit 1
+}
 if ((Test-Path -LiteralPath $targetPlayersDb) -and -not $Overwrite) {
     if ($lang -eq "es") {
         Write-PZTStep "El destino ya tiene players.db. Anade -Overwrite despues de revisar la salida -WhatIf." "pz-copy-players"
@@ -74,14 +81,13 @@ if ($IncludePlayerFolder -and (Test-Path -LiteralPath $sourcePlayerDir)) {
     Copy-Item -LiteralPath $sourcePlayerDir -Destination $targetPlayerDir -Recurse -Force
 }
 
-$dbLiteral = $targetPlayersDb.Replace("\", "\\").Replace("'", "''")
-$sourceLiteral = $sourceSaveName.Replace("\", "\\").Replace("'", "''")
-$targetLiteral = $targetSaveName.Replace("\", "\\").Replace("'", "''")
-Invoke-PZTPython -Code @"
-import sqlite3
-con = sqlite3.connect(r'$dbLiteral')
+Invoke-PZTPythonJson -InputObject @{ db = $targetPlayersDb; source = $sourceSaveName; target = $targetSaveName } -Code @"
+import json, sqlite3, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    args = json.load(f)
+con = sqlite3.connect(args["db"])
 cur = con.cursor()
-cur.execute("update networkPlayers set world=? where world=?", ('$targetLiteral', '$sourceLiteral'))
+cur.execute("update networkPlayers set world=? where world=?", (args["target"], args["source"]))
 print("Updated players.db world rows:", cur.rowcount)
 con.commit()
 con.close()

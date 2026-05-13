@@ -4,6 +4,8 @@ param(
     [string]$ZomboidRoot,
     [string]$BackupRoot,
     [switch]$Overwrite,
+    [switch]$AllowIncompleteBackup,
+    [switch]$ConfirmRestore,
     [switch]$WhatIf
 )
 
@@ -107,15 +109,13 @@ function Update-PlayersWorldName {
     if ($SourceProfileName -eq $TargetProfileName) { return }
     if (-not (Test-Path -LiteralPath $PlayersDb)) { return }
 
-    $dbLiteral = $PlayersDb.Replace("\", "\\").Replace("'", "''")
-    $sourceLiteral = $SourceProfileName.Replace("\", "\\").Replace("'", "''")
-    $targetLiteral = $TargetProfileName.Replace("\", "\\").Replace("'", "''")
     $code = @"
-import sqlite3
-
-db = r'$dbLiteral'
-source = r'$sourceLiteral'
-target = r'$targetLiteral'
+import json, sqlite3, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    args = json.load(f)
+db = args["db"]
+source = args["source"]
+target = args["target"]
 
 con = sqlite3.connect(db)
 cur = con.cursor()
@@ -124,7 +124,7 @@ print("Updated players.db world rows:", cur.rowcount)
 con.commit()
 con.close()
 "@
-    Invoke-PZTPython -Code $code
+    Invoke-PZTPythonJson -Code $code -InputObject @{ db = $PlayersDb; source = $SourceProfileName; target = $TargetProfileName }
 }
 
 Assert-PZTNoGameProcesses
@@ -135,10 +135,19 @@ if (-not (Test-Path -LiteralPath $BackupPath)) {
     exit 1
 }
 $resolvedBackup = (Resolve-Path -LiteralPath $BackupPath).Path
+$backupStatus = if (Test-PZTBackupComplete -BackupPath $resolvedBackup) { "COMPLETE" } else { "NOT COMPLETE" }
+if ($backupStatus -ne "COMPLETE" -and -not $AllowIncompleteBackup) {
+    Write-PZTStep "Backup status is not COMPLETE. Refusing to restore: $resolvedBackup" "pz-restore-profile"
+    Write-PZTStep "Run verify-backup, choose a complete backup, or add -AllowIncompleteBackup only for manual rescue." "pz-restore-profile"
+    exit 1
+}
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -BackupRoot $BackupRoot
 $sourceProfile = Get-SourceProfileName -BackupPath $resolvedBackup
+Assert-PZTProfileNameSafe -ProfileName $sourceProfile -ParamName "SourceProfileName"
 $sourceSaveName = Get-SourceSaveName -BackupPath $resolvedBackup -SourceProfileName $sourceProfile
+Assert-PZTProfileNameSafe -ProfileName $sourceSaveName -ParamName "SourceSaveName"
 if (-not $TargetProfileName) { $TargetProfileName = $sourceProfile }
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $TargetProfileName
 $targetSaveName = Convert-PZTProfileNameToSaveName -ProfileName $TargetProfileName
 
 $backupServerDir = Join-Path $resolvedBackup "Server"
@@ -157,6 +166,7 @@ if (Test-Path -LiteralPath $targetPlayerDir) { $existingTargets += $targetPlayer
 if (Test-Path -LiteralPath $targetDb) { $existingTargets += $targetDb }
 
 Write-PZTStep "Backup: $resolvedBackup" "pz-restore-profile"
+Write-PZTStep "Backup status: $backupStatus" "pz-restore-profile"
 Write-PZTStep "Source profile: $sourceProfile" "pz-restore-profile"
 if ($sourceProfile -ne $sourceSaveName) { Write-PZTStep "Source save name: $sourceSaveName" "pz-restore-profile" }
 Write-PZTStep "Target profile: $TargetProfileName" "pz-restore-profile"
@@ -176,6 +186,11 @@ if ($WhatIf) {
         Write-PZTStep "Would rename restored files/folders and update players.db world rows from '$sourceSaveName' to '$targetSaveName'." "pz-restore-profile"
     }
     exit 0
+}
+
+if (-not $ConfirmRestore) {
+    Write-PZTStep "Refusing real restore without -ConfirmRestore. Run with -WhatIf first, then add -ConfirmRestore when the target is correct." "pz-restore-profile"
+    exit 1
 }
 
 if ($existingTargets.Count -gt 0) {

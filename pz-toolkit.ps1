@@ -477,7 +477,7 @@ function Show-Menu {
                 Invoke-ToolkitCommand -Name "copy-world" -Args $args
                 $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la copia real de mundo? Los datos del destino pueden sobrescribirse con -Overwrite." } else { "Run the real copy-world operation now? Target world data may be overwritten with -Overwrite." }
                 if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                    $realArgs = @("-SourceProfileName", $source, "-TargetProfileName", $target, "-Overwrite")
+                    $realArgs = @("-SourceProfileName", $source, "-TargetProfileName", $target, "-Overwrite", "-ConfirmCopy")
                     Invoke-ToolkitCommand -Name "copy-world" -Args $realArgs
                 }
             }
@@ -491,7 +491,7 @@ function Show-Menu {
                 Invoke-ToolkitCommand -Name "copy-players" -Args $args
                 $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la copia real de jugadores? Si existe players.db en destino requiere overwrite." } else { "Run the real copy-players operation now? Existing target players.db requires overwrite." }
                 if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                    $realArgs = @("-SourceProfileName", $source, "-TargetProfileName", $target, "-Overwrite")
+                    $realArgs = @("-SourceProfileName", $source, "-TargetProfileName", $target, "-Overwrite", "-ConfirmCopy")
                     Invoke-ToolkitCommand -Name "copy-players" -Args $realArgs
                 }
             }
@@ -536,7 +536,7 @@ function Show-Menu {
                     Invoke-ToolkitCommand -Name "restore-profile" -Args $args
                     $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la restauracion/copia real?" } else { "Run the real restore/copy operation now?" }
                     if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                        $realArgs = @("-BackupPath", $backup)
+                        $realArgs = @("-BackupPath", $backup, "-ConfirmRestore")
                         if ($target) { $realArgs += @("-TargetProfileName", $target) }
                         if ($allowOverwrite) { $realArgs += "-Overwrite" }
                         Invoke-ToolkitCommand -Name "restore-profile" -Args $realArgs
@@ -550,7 +550,7 @@ function Show-Menu {
                     Invoke-ToolkitCommand -Name "reset-world" -Args @("-ProfileName", $profile, "-WhatIf")
                     $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora el reset real del mundo?" } else { "Run the real reset-world operation now?" }
                     if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                        Invoke-ToolkitCommand -Name "reset-world" -Args @("-ProfileName", $profile)
+                        Invoke-ToolkitCommand -Name "reset-world" -Args @("-ProfileName", $profile, "-ConfirmReset")
                     }
                 }
             }
@@ -565,7 +565,7 @@ function Show-Menu {
                     Invoke-ToolkitCommand -Name "reset-player" -Args $args
                     $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora el reset real del jugador?" } else { "Run the real reset-player operation now?" }
                     if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                        $realArgs = @("-ProfileName", $profile, "-PlayerIndex", "0")
+                        $realArgs = @("-ProfileName", $profile, "-PlayerIndex", "0", "-ConfirmReset")
                         if ($username) { $realArgs += @("-Username", $username) }
                         Invoke-ToolkitCommand -Name "reset-player" -Args $realArgs
                     }

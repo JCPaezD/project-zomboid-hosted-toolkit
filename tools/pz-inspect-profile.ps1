@@ -16,6 +16,7 @@ if (-not $ProfileName) {
     $ProfileName = Read-PZTMenuChoice -Prompt $(if ($lang -eq "es") { "Elige perfil hosted para inspeccionar" } else { "Choose hosted profile to inspect" }) -Items (Get-PZTHostedProfileNames -ServerDir $paths.ServerDir) -AllowCancel
     if (-not $ProfileName) { exit 0 }
 }
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
 
 $ini = Join-Path $paths.ServerDir "$ProfileName.ini"
 $sandbox = Join-Path $paths.ServerDir "${ProfileName}_SandboxVars.lua"

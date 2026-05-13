@@ -12,6 +12,7 @@ if (-not $Json) { Write-PZTTitle "PZ Hosted Toolkit - Quick Diagnosis" "pz-quick
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot
 $profiles = @(Get-PZTHostedProfileNames -ServerDir $paths.ServerDir)
 if ($ProfileName) {
+    Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
     $profilesToCheck = @($ProfileName)
 }
 else {

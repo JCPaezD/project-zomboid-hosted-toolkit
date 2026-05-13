@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 Write-PZTTitle "PZ Hosted Toolkit - Backup Profile" "pz-backup-profile"
 
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -BackupRoot $BackupRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
 $saveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $ProfileName
 $backupDir = Join-Path $paths.BackupRoot ("profile-$ProfileName-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 $lang = Get-PZTLanguage

@@ -4,6 +4,7 @@ param(
     [string]$BackupRoot,
     [switch]$IncludeDb = $true,
     [switch]$IncludePlayerFolder = $true,
+    [switch]$ConfirmReset,
     [switch]$WhatIf
 )
 
@@ -14,6 +15,7 @@ Write-PZTTitle "PZ Hosted Toolkit - Reset Hosted World" "pz-reset-hosted-world"
 
 Assert-PZTNoGameProcesses
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -BackupRoot $BackupRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $ProfileName
 $saveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $ProfileName
 
 $saveDir = Join-Path $paths.SavesDir $saveName
@@ -38,6 +40,11 @@ if ($players.Count -gt 0) { $players | Select-Object username, playerIndex, name
 if ($WhatIf) {
     Write-PZTStep "WhatIf: no files will be moved." "pz-reset-hosted-world"
     exit 0
+}
+
+if (-not $ConfirmReset) {
+    Write-PZTStep "Refusing real world reset without -ConfirmReset. Run with -WhatIf first, then add -ConfirmReset when the selected profile is correct." "pz-reset-hosted-world"
+    exit 1
 }
 
 $backupDir = New-PZTBackupDir -BackupRoot $paths.BackupRoot -Name "$ProfileName-world-before-reset"

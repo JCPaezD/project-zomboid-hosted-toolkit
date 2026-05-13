@@ -63,7 +63,7 @@ if ($IncludeWorkshop -and $paths.WorkshopRoot -and (Test-Path -LiteralPath (Join
 $result = [pscustomobject]@{
     Time = Get-Date
     Paths = $paths
-    Processes = @(Get-PZTGameProcesses | Select-Object ProcessId, Name, CommandLine)
+    Processes = @(Get-PZTGameProcesses | Select-Object ProcessId, Name, @{Name="CommandLine";Expression={ Format-PZTProcessCommandLine -CommandLine $_.CommandLine }})
     Tree = @(
         Get-PZTTreeSummary -Path $paths.ServerDir
         Get-PZTTreeSummary -Path $paths.SavesDir

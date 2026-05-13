@@ -1,0 +1,14 @@
+name: Smoke tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run smoke tests
+        shell: powershell
+        run: .\tests\run-smoke-tests.ps1

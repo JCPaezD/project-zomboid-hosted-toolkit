@@ -5,6 +5,7 @@ PZ Hosted Toolkit is intentionally conservative. Contributions should preserve t
 - read-only tools should stay read-only;
 - write-capable tools need clear previews, confirmations, and/or backups;
 - examples and tests must not contain personal save data, Steam IDs, or private logs.
+- issues and examples should redact private paths, usernames, Steam IDs, IPs, and save data; see `docs/privacy.md`.
 
 ## Development workflow
 
@@ -23,4 +24,3 @@ Document user-facing behavior in `README.md` or `docs/`. Avoid assuming the read
 ## Safety
 
 Do not add automatic save/chunk repair as a default behavior. Any future repair tool should operate on copied profiles first and explain data-loss risk clearly.
-

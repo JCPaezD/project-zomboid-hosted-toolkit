@@ -6,6 +6,7 @@ param(
     [switch]$IncludePlayerFolder = $true,
     [switch]$IncludeProfileDb = $true,
     [switch]$Overwrite,
+    [switch]$ConfirmCopy,
     [switch]$WhatIf
 )
 
@@ -16,6 +17,8 @@ Write-PZTTitle "PZ Hosted Toolkit - Copy World" "pz-copy-world"
 Assert-PZTNoGameProcesses
 
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -BackupRoot $BackupRoot
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $SourceProfileName
+Assert-PZTProfilePathsContained -Paths $paths -ProfileName $TargetProfileName
 $sourceSaveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $SourceProfileName
 $targetSaveName = Convert-PZTProfileNameToSaveName -ProfileName $TargetProfileName
 $sourceSaveDir = Join-Path $paths.SavesDir $sourceSaveName
@@ -64,6 +67,11 @@ if ($WhatIf) {
     exit 0
 }
 
+if (-not $ConfirmCopy) {
+    Write-PZTStep "Refusing real world copy without -ConfirmCopy. Run with -WhatIf first, then add -ConfirmCopy when source and target are correct." "pz-copy-world"
+    exit 1
+}
+
 if ($existing.Count -gt 0) {
     $safety = New-PZTBackupDir -BackupRoot $paths.BackupRoot -Name "$TargetProfileName-world-before-copy"
     New-Item -ItemType Directory -Path (Join-Path $safety "Saves\Multiplayer") -Force | Out-Null
@@ -86,14 +94,13 @@ if ($IncludeProfileDb -and (Test-Path -LiteralPath $sourceDb)) {
 
 $playersDb = Join-Path $targetSaveDir "players.db"
 if (Test-Path -LiteralPath $playersDb) {
-    $dbLiteral = $playersDb.Replace("\", "\\").Replace("'", "''")
-    $sourceLiteral = $sourceSaveName.Replace("\", "\\").Replace("'", "''")
-    $targetLiteral = $targetSaveName.Replace("\", "\\").Replace("'", "''")
-    Invoke-PZTPython -Code @"
-import sqlite3
-con = sqlite3.connect(r'$dbLiteral')
+    Invoke-PZTPythonJson -InputObject @{ db = $playersDb; source = $sourceSaveName; target = $targetSaveName } -Code @"
+import json, sqlite3, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    args = json.load(f)
+con = sqlite3.connect(args["db"])
 cur = con.cursor()
-cur.execute("update networkPlayers set world=? where world=?", ('$targetLiteral', '$sourceLiteral'))
+cur.execute("update networkPlayers set world=? where world=?", (args["target"], args["source"]))
 print("Updated players.db world rows:", cur.rowcount)
 con.commit()
 con.close()
