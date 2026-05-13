@@ -152,7 +152,7 @@ Clear the client global mod list after using the single-player Mods menu:
 
 ```powershell
 .\pz-toolkit.ps1 clear-client-mods -WhatIf
-.\pz-toolkit.ps1 clear-client-mods
+.\pz-toolkit.ps1 clear-client-mods -ConfirmClear
 ```
 
 Restore a profile backup, or copy it into a new hosted profile:
@@ -217,6 +217,7 @@ Repair a specific Workshop redownload/cache case:
 
 ```powershell
 .\pz-toolkit.ps1 repair-workshop -WhatIf
+.\pz-toolkit.ps1 repair-workshop -ConfirmRepair
 ```
 
 You can still call any script directly under `tools\` if you prefer. The root `pz-toolkit.ps1` hub supports both modes:
@@ -255,8 +256,9 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | --- | --- |
 | Diagnosis and inspection | Read-only. |
 | Backup and export | Writes only under toolkit `backups\` or `exports\` unless an explicit path is provided. |
+| Clear client mods | Supports `-WhatIf`; real direct-script operation requires `-ConfirmClear`. |
 | Restore/copy/reset | Supports `-WhatIf`; real direct-script operations require explicit confirmation flags such as `-ConfirmRestore`, `-ConfirmCopy`, or `-ConfirmReset`. |
-| Workshop repair | Narrow repair only; use `-WhatIf` first and close PZ/Steam helper processes before writing. |
+| Workshop repair | Narrow repair only; use `-WhatIf` first, close PZ/Steam helper processes before writing, and add `-ConfirmRepair` for the real operation. |
 
 ## Testing
 

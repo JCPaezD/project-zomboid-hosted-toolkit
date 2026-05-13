@@ -440,12 +440,16 @@ function Show-Menu {
                 Invoke-ToolkitCommand -Name "clear-client-mods" -Args @("-WhatIf")
                 $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la limpieza real de mods globales?" } else { "Run the real clear-client-mods operation now?" }
                 if (Read-PZTYesNo -Prompt $prompt -Default $false) {
-                    Invoke-ToolkitCommand -Name "clear-client-mods"
+                    Invoke-ToolkitCommand -Name "clear-client-mods" -Args @("-ConfirmClear")
                 }
             }
             "Repair Workshop redownload issue (WhatIf)" {
                 Write-ToolkitPrepTitle "Preparing - Repair Workshop redownload issue" "Preparando - Reparar redownload Workshop"
                 Invoke-ToolkitCommand -Name "repair-workshop" -Args @("-WhatIf")
+                $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la reparacion real de Workshop?" } else { "Run the real repair-workshop operation now?" }
+                if (Read-PZTYesNo -Prompt $prompt -Default $false) {
+                    Invoke-ToolkitCommand -Name "repair-workshop" -Args @("-ConfirmRepair")
+                }
             }
             "Compare sandbox profiles" {
                 Write-ToolkitPrepTitle "Preparing - Compare sandbox profiles" "Preparando - Comparar sandbox"

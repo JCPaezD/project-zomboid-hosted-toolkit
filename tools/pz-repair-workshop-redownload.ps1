@@ -3,6 +3,7 @@ param(
     [string]$ZomboidRoot,
     [string]$BackupRoot,
     [string]$ItemId,
+    [switch]$ConfirmRepair,
     [switch]$WhatIf
 )
 
@@ -75,6 +76,11 @@ function Test-ExclusiveAccess {
     }
 }
 
+function Assert-WorkshopItemIdSafe {
+    param([Parameter(Mandatory=$true)][string]$Value)
+    if ($Value -notmatch '^\d+$') { throw "Workshop ItemId must contain digits only." }
+}
+
 $paths = Get-PZTPaths -ZomboidRoot $ZomboidRoot -WorkshopRoot $WorkshopRoot -BackupRoot $BackupRoot
 if (-not $paths.WorkshopRoot) { throw "Workshop root not found. Pass -WorkshopRoot." }
 
@@ -92,6 +98,7 @@ if (-not $ItemId) {
     }
     Write-PZTStep "Detected Workshop ID from log: $ItemId ($($latest.FullName))" "pz-repair-workshop"
 }
+Assert-WorkshopItemIdSafe -Value $ItemId
 
 Assert-PZTNoGameProcesses
 
@@ -122,6 +129,8 @@ $contentBase = Join-Path $selectedRoot "content\108600"
 $downloadBase = Join-Path $selectedRoot "downloads\108600"
 $contentRoot = $selectedContentRoot
 $downloadRoot = $selectedDownloadRoot
+Assert-PZTPathInside -Path $contentRoot -Parent $contentBase -Description "installed Workshop item folder" | Out-Null
+Assert-PZTPathInside -Path $downloadRoot -Parent $downloadBase -Description "prepared Workshop download folder" | Out-Null
 
 if (-not (Test-Path -LiteralPath $contentRoot)) {
     Write-PZTStep "Installed Workshop folder not found: $contentRoot." "pz-repair-workshop"
@@ -146,10 +155,9 @@ if (-not (Test-Path -LiteralPath $downloadRoot)) {
 }
 
 $resolvedBase = (Resolve-Path -LiteralPath $contentBase).Path
-$resolvedContent = (Resolve-Path -LiteralPath $contentRoot).Path
-if (-not $resolvedContent.StartsWith($resolvedBase, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing unexpected installed path: $resolvedContent"
-}
+$resolvedContent = Assert-PZTPathInside -Path (Resolve-Path -LiteralPath $contentRoot).Path -Parent $resolvedBase -Description "installed Workshop item folder"
+$resolvedDownloadBase = (Resolve-Path -LiteralPath $downloadBase).Path
+$resolvedDownload = Assert-PZTPathInside -Path (Resolve-Path -LiteralPath $downloadRoot).Path -Parent $resolvedDownloadBase -Description "prepared Workshop download folder"
 
 Get-ChildItem -LiteralPath $contentRoot -Recurse -File -Filter *.jar -ErrorAction SilentlyContinue | ForEach-Object {
     if (-not (Test-ExclusiveAccess -Path $_.FullName)) {
@@ -173,6 +181,11 @@ if ($WhatIf) {
     exit 0
 }
 
-Move-Item -LiteralPath $contentRoot -Destination $backupDir -Force
-Copy-Item -LiteralPath $downloadRoot -Destination $contentRoot -Recurse
+if (-not $ConfirmRepair) {
+    Write-PZTStep "Refusing real Workshop repair without -ConfirmRepair. Run with -WhatIf first, then add -ConfirmRepair when the item and folders are correct." "pz-repair-workshop"
+    exit 1
+}
+
+Move-Item -LiteralPath $resolvedContent -Destination $backupDir -Force
+Copy-Item -LiteralPath $resolvedDownload -Destination $resolvedContent -Recurse
 Write-PZTStep "Repair applied. Relaunch the hosted server." "pz-repair-workshop"

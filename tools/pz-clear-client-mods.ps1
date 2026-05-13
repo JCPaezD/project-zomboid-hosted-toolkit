@@ -1,6 +1,7 @@
 param(
     [string]$ZomboidRoot,
     [string]$BackupRoot,
+    [switch]$ConfirmClear,
     [switch]$WhatIf
 )
 
@@ -38,6 +39,10 @@ $active = if (Test-Path -LiteralPath $defaultPath) {
 Write-PZTStep "Client global mod list: $defaultPath" "pz-clear-client-mods"
 Write-PZTStep "Active mod lines detected: $active" "pz-clear-client-mods"
 if ($WhatIf) { Write-PZTStep "WhatIf: no file will be changed." "pz-clear-client-mods"; exit 0 }
+if (-not $ConfirmClear) {
+    Write-PZTStep "Refusing real clear-client-mods without -ConfirmClear. Run with -WhatIf first, then add -ConfirmClear when the target file is correct." "pz-clear-client-mods"
+    exit 1
+}
 
 $backupDir = New-PZTBackupDir -BackupRoot $paths.BackupRoot -Name "client-default-mods"
 if (Test-Path -LiteralPath $defaultPath) {

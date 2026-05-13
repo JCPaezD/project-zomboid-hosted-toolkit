@@ -97,5 +97,5 @@ If `ClientMods.ActiveModLines` is greater than zero and you are about to host a 
 
 ```powershell
 .\pz-toolkit.ps1 clear-client-mods -WhatIf
-.\pz-toolkit.ps1 clear-client-mods
+.\pz-toolkit.ps1 clear-client-mods -ConfirmClear
 ```

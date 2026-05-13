@@ -2,7 +2,7 @@
 
 ## 0.1.0-alpha - 2026-05-13
 
-- Hardened public alpha safety checks: profile-name validation, path containment, complete-backup enforcement on restore, JSON-based SQLite helper input, explicit confirmation flags for direct restore/copy/reset operations, privacy docs, issue template, and smoke-test CI.
+- Hardened public alpha safety checks: profile-name validation, path containment, complete-backup enforcement on restore, JSON-based SQLite helper input, explicit confirmation flags for direct repair/clear/restore/copy/reset operations, privacy docs, issue template, and smoke-test CI.
 - Added `pz-inspect-blam.ps1` to inspect B42 `blam` chunk-load failures safely.
 - Added `pz-compare-mods.ps1` to compare `Mods`, `WorkshopItems`, and `Map` lists between hosted profiles.
 - Added `pz-health-check.ps1` for one-profile consistency checks.

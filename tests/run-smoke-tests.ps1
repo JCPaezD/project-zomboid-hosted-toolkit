@@ -232,10 +232,35 @@ name=Example Mod
 id=ExampleMod
 "@
 
+Invoke-Checked -Name "repair workshop rejects unsafe item id" -Script {
+    . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
+    function Assert-WorkshopItemIdSafeForTest {
+        param([Parameter(Mandatory=$true)][string]$Value)
+        if ($Value -notmatch '^\d+$') { throw "Workshop ItemId must contain digits only." }
+    }
+    try {
+        Assert-WorkshopItemIdSafeForTest -Value "..\123"
+        "not rejected"
+    }
+    catch {
+        $_.Exception.Message
+    }
+} -Assert { param($text) $text -match "digits only" }
+
+Invoke-Checked -Name "repair workshop requires confirm for real repair" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-repair-workshop-redownload.ps1") -ZomboidRoot $zRoot -WorkshopRoot $workshopRoot -BackupRoot $backupRoot -ItemId "123" 2>&1
+} -Assert { param($text) $text -match "without -ConfirmRepair" }
+
 Invoke-Checked -Name "clear client mods what-if keeps file" -Script {
     & (Join-Path $root "tools\pz-clear-client-mods.ps1") -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
     Get-Content -LiteralPath (Join-Path $modsDir "default.txt") -Raw
 } -Assert { param($text) $text -match "ExampleClientMod" }
+
+Invoke-Checked -Name "clear client mods requires confirm for real clear" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-clear-client-mods.ps1") -ZomboidRoot $zRoot -BackupRoot $backupRoot 2>&1
+} -Assert { param($text) $text -match "without -ConfirmClear" -and (Get-Content -LiteralPath (Join-Path $modsDir "default.txt") -Raw) -match "ExampleClientMod" }
 
 Invoke-Checked -Name "export profile writes checklist" -Script {
     & (Join-Path $root "tools\pz-export-profile.ps1") -ProfileName $profile -ZomboidRoot $zRoot -WorkshopRoot $workshopRoot -OutputDir $exportRoot

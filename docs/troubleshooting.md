@@ -28,6 +28,7 @@ With the command hub:
 .\pz-toolkit.ps1 quick-diagnosis
 .\pz-toolkit.ps1 errors -ServerOnly
 .\pz-toolkit.ps1 repair-workshop -WhatIf
+.\pz-toolkit.ps1 repair-workshop -ConfirmRepair
 ```
 
 If `quick-diagnosis` reports `Workshop update lock`, the most likely cause is that PZ, ZombieBuddy, Java, or Steam was trying to update a Workshop item while a JAR/file from that item was still loaded. Close those processes, wait a short moment for Steam to finish, and retry hosting once before doing any manual repair.
@@ -52,7 +53,7 @@ Use:
 
 ```powershell
 .\pz-toolkit.ps1 clear-client-mods -WhatIf
-.\pz-toolkit.ps1 clear-client-mods
+.\pz-toolkit.ps1 clear-client-mods -ConfirmClear
 ```
 
 This does not unsubscribe from Workshop items. It clears the global client preload list.
