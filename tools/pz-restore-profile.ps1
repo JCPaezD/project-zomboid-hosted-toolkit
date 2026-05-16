@@ -171,6 +171,12 @@ Write-PZTStep "Source profile: $sourceProfile" "pz-restore-profile"
 if ($sourceProfile -ne $sourceSaveName) { Write-PZTStep "Source save name: $sourceSaveName" "pz-restore-profile" }
 Write-PZTStep "Target profile: $TargetProfileName" "pz-restore-profile"
 if ($TargetProfileName -ne $targetSaveName) { Write-PZTStep "Target save name: $targetSaveName" "pz-restore-profile" }
+if ($sourceProfile -ne $TargetProfileName -or $sourceSaveName -ne $targetSaveName) {
+    Write-Host ""
+    Write-Host "=== Profile identity warning ==="
+    Write-PZTProfileIdentityWarning "pz-restore-profile"
+    Write-Host ""
+}
 if ($existingTargets.Count -gt 0) {
     Write-PZTStep "Existing target paths: $($existingTargets.Count)" "pz-restore-profile"
     if (-not $Overwrite) {
@@ -184,6 +190,7 @@ if ($WhatIf) {
     Write-PZTStep "Would restore/copy Server files, save folder, optional _player folder, and optional db file." "pz-restore-profile"
     if ($sourceProfile -ne $TargetProfileName) {
         Write-PZTStep "Would rename restored files/folders and update players.db world rows from '$sourceSaveName' to '$targetSaveName'." "pz-restore-profile"
+        Write-PZTStep "Treat this as a lab/fork copy unless you have a plan for client-local map data on every player machine." "pz-restore-profile"
     }
     exit 0
 }

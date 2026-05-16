@@ -39,6 +39,9 @@ else {
     Write-PZTStep "Source profile: $SourceProfileName ($sourceSaveName)" "pz-copy-players"
     Write-PZTStep "Target profile: $TargetProfileName ($targetSaveName)" "pz-copy-players"
 }
+Write-Host ""
+Write-Host ($(if ($lang -eq "es") { "=== Advertencia sobre identidad de perfil ===" } else { "=== Profile identity warning ===" }))
+Write-PZTProfileIdentityWarning "pz-copy-players"
 $sourcePlayers = @(Get-PZTPlayersInfo -PlayersDb $sourcePlayersDb)
 $targetPlayers = @(Get-PZTPlayersInfo -PlayersDb $targetPlayersDb)
 Write-Host ""

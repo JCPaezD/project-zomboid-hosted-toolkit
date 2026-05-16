@@ -29,7 +29,7 @@ Use WhatIf/dry-run first for repair, reset, copy, restore, and cleanup actions.
 - Running a quick read-only diagnosis before touching files.
 - Backing up a hosted profile before changing mods, sandbox settings, players, or world data.
 - Verifying toolkit-created backups before relying on them.
-- Restoring a backup to the original hosted profile or to a new profile name.
+- Restoring a backup to the original hosted profile, or creating a lab/fork copy under a new profile name.
 - Inspecting hosted profile files, mods, maps, save size, player rows, and recent state.
 - Comparing active mods, Workshop IDs, map lists, and sandbox settings between profiles.
 - Exporting mod, Workshop, map, server setting, sandbox, and player summaries for review.
@@ -155,14 +155,16 @@ Clear the client global mod list after using the single-player Mods menu:
 .\pz-toolkit.ps1 clear-client-mods -ConfirmClear
 ```
 
-Restore a profile backup, or copy it into a new hosted profile:
+Restore a profile backup, or create a lab/fork copy under a new hosted profile name:
 
 ```powershell
 .\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -WhatIf
 .\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -TargetProfileName "MyHostedServer_Copy" -WhatIf
 ```
 
-When copying to a new profile name, the restore tool renames the server files, save folder, optional `_player` folder, profile database, and `players.db` world rows. If `PublicName` exactly matches the source profile name, it is updated too. Real restore operations require `-ConfirmRestore` after you review `-WhatIf` output.
+For an active co-op game you intend to keep playing, prefer restoring to the same profile name or making a backup and editing that same profile in place. A hosted profile name is part of the game's identity, not just a label. Copying a live save to a new name can detach client-local state on each player's machine, such as explored map, map symbols, thumbnails, and other per-client files.
+
+When copying to a new profile name, treat the result as a lab copy, fork, or disposable test unless you have a plan for each player's local client state. The restore tool renames the server files, save folder, optional `_player` folder, profile database, and `players.db` world rows. If `PublicName` exactly matches the source profile name, it is updated too. Real restore operations require `-ConfirmRestore` after you review `-WhatIf` output.
 
 Find recent known error patterns:
 
@@ -192,7 +194,7 @@ Inspect Build 42 `blam` / problem chunk markers:
 .\pz-toolkit.ps1 inspect-blam -ProfileName "MyHostedServer"
 ```
 
-Copy world/save data or players between profiles:
+Copy world/save data or players between profiles, mainly for lab/fork workflows:
 
 ```powershell
 .\pz-toolkit.ps1 copy-world -SourceProfileName "SourceProfile" -TargetProfileName "TargetProfile" -WhatIf
@@ -238,15 +240,15 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | `tools/pz-inspect-blam.ps1` | Inspect `Saves\Multiplayer\<profile>\blam` for chunk load failures and explain safe next checks. |
 | `tools/pz-backup-profile.ps1` | Back up `Server\<profile>.*`, `Saves\Multiplayer\<profile>`, `<profile>_player`, and `db\<profile>.db`. |
 | `tools/pz-verify-backup.ps1` | Check whether a toolkit backup is marked complete and contains the expected profile/save/db pieces. |
-| `tools/pz-restore-profile.ps1` | Restore a profile backup to its original name or copy it into a new profile name. |
+| `tools/pz-restore-profile.ps1` | Restore a profile backup to its original name or create a lab/fork copy under a new profile name. |
 | `tools/pz-export-profile.ps1` | Export `Mods`, `WorkshopItems`, `Map`, server settings, sandbox, Workshop checklist, and player CSV data. |
 | `tools/pz-clear-client-mods.ps1` | Back up and clear `Zomboid\mods\default.txt` so single-player active mods do not preload before Host. |
 | `tools/pz-reset-hosted-player.ps1` | Delete one row from `Saves\Multiplayer\<profile>\players.db.networkPlayers` after backup. |
 | `tools/pz-reset-hosted-world.ps1` | Move the selected profile's world/player/db out of the game so the next launch starts fresh. |
 | `tools/pz-compare-sandbox.ps1` | Compare simple key/value paths in two hosted `SandboxVars.lua` files, summarizing profile-only/mod sections by default. |
 | `tools/pz-compare-mods.ps1` | Compare `Mods`, `WorkshopItems`, and `Map` lists between two hosted profiles, with compact defaults and detailed mode. |
-| `tools/pz-copy-world.ps1` | Copy one profile's save/world data into another existing profile, with safety backup on overwrite. |
-| `tools/pz-copy-players.ps1` | Copy hosted player rows and optional `_player` folder from one profile to another. |
+| `tools/pz-copy-world.ps1` | Copy one profile's save/world data into another existing profile for lab/fork workflows, with safety backup on overwrite. |
+| `tools/pz-copy-players.ps1` | Copy hosted player rows and optional `_player` folder from one profile to another for lab/fork workflows. |
 | `tools/pz-find-latest-error.ps1` | Search latest PZ logs for common failure patterns. |
 | `tools/pz-repair-workshop-redownload.ps1` | Conservative repair for `Installed|NeedsUpdate` plus prepared Workshop download cache. |
 
@@ -313,6 +315,7 @@ See [docs/privacy.md](docs/privacy.md) for a short redaction checklist.
 ## Important Caveats
 
 - Hosted servers and dedicated servers have different operational shapes. These scripts target hosted/co-op profiles.
+- Hosted profile names can matter to clients. For a live co-op game, changing the active profile name can detach explored map or other local per-client state. Prefer backups plus in-place edits when continuity matters.
 - Subscribing to extra Workshop items is usually harmless. Loading extra mods in a server profile is not.
 - The in-game Mods menu can leave a global client mod list active in `mods\default.txt`; this can preload Java mods and block updates.
 - `players.db` stores hosted MP player rows. The in-game Delete Player flow can fail before deleting those rows in some Build 42 cases.

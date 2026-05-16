@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Reframed restore/copy-to-new-profile operations as lab/fork workflows rather than transparent live-game migrations.
+- Added profile identity warnings to restore, copy-world, and copy-players flows because changing hosted profile names can detach client-local state such as explored map, map symbols, thumbnails, and other per-client files.
+- Updated public docs to recommend stable profile names plus backups/in-place edits for active co-op games.
+
 ## 0.1.0-alpha - 2026-05-13
 
 - Hardened public alpha safety checks: profile-name validation, path containment, complete-backup enforcement on restore, JSON-based SQLite helper input, explicit confirmation flags for direct repair/clear/restore/copy/reset operations, privacy docs, issue template, and smoke-test CI.

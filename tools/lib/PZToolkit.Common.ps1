@@ -67,6 +67,20 @@ function Get-PZTText {
     return $English
 }
 
+function Write-PZTProfileIdentityWarning {
+    param([string]$Scope = "pz-toolkit")
+
+    Write-PZTStep (Get-PZTText `
+        "Profile names are part of hosted/co-op identity, not just labels." `
+        "Los nombres de perfil forman parte de la identidad hosted/co-op; no son solo etiquetas.") $Scope
+    Write-PZTStep (Get-PZTText `
+        "Copying or continuing a live co-op save under another profile name can detach client-local state such as explored map, map symbols, thumbnails, or other per-client files." `
+        "Copiar o continuar una partida co-op viva con otro nombre de perfil puede desenganchar estado local de clientes: mapa explorado, simbolos, miniaturas u otros archivos por cliente.") $Scope
+    Write-PZTStep (Get-PZTText `
+        "For active co-op games, prefer backing up and editing the same profile name in place. Use new profile names mainly for lab copies, forks, or disposable tests." `
+        "Para partidas co-op activas, prefiere backup y edicion in-place manteniendo el mismo nombre. Usa nombres nuevos sobre todo para copias de laboratorio, forks o pruebas desechables.") $Scope
+}
+
 function Get-PZTDefaultZomboidRoot {
     $candidate = Join-Path $env:USERPROFILE "Zomboid"
     if (Test-Path -LiteralPath $candidate) { return (Resolve-Path -LiteralPath $candidate).Path }

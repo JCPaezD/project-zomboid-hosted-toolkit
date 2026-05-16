@@ -313,6 +313,14 @@ Invoke-Checked -Name "backup and restore profile as copy" -Script {
     Test-Path -LiteralPath (Join-Path $serverDir "RestoredProfile.ini")
 } -Assert { param($text) $text -match "Status: COMPLETE" -and $text -match "PublicName=RestoredProfile" -and $text -match "True" }
 
+Invoke-Checked -Name "restore copy warns about profile identity" -Script {
+    $backup = Get-ChildItem -LiteralPath $backupRoot -Directory -Filter "profile-$profile-*" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-restore-profile.ps1") -BackupPath $backup.FullName -TargetProfileName "IdentityWarningCopy" -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf 2>&1
+} -Assert { param($text) $text -match "Profile identity warning" -and $text -match "client-local state" -and $text -match "lab/fork" }
+
 Invoke-Checked -Name "restore refuses incomplete backup by default" -Script {
     $backup = Get-ChildItem -LiteralPath $backupRoot -Directory -Filter "profile-$profile-*" |
         Sort-Object LastWriteTime -Descending |
@@ -358,11 +366,22 @@ Invoke-Checked -Name "copy world what-if describes transfer" -Script {
     & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-copy-world.ps1") -SourceProfileName $profile -TargetProfileName $otherProfile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
 } -Assert { param($text) $text -match "Source profile: TestProfile" -and $text -match "Target profile: OtherProfile" -and $text -match "WhatIf" }
 
+Invoke-Checked -Name "copy world warns about profile identity" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-copy-world.ps1") -SourceProfileName $profile -TargetProfileName $otherProfile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
+} -Assert { param($text) $text -match "Profile identity warning" -and $text -match "client-local state" }
+
 Invoke-Checked -Name "copy players what-if describes transfer" -Script {
     New-Item -ItemType Directory -Path (Join-Path $savesDir $otherProfile) -Force | Out-Null
     $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
     & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-copy-players.ps1") -SourceProfileName $profile -TargetProfileName $otherProfile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
 } -Assert { param($text) $text -match "Source profile: TestProfile" -and $text -match "Target profile: OtherProfile" -and $text -match "WhatIf" }
+
+Invoke-Checked -Name "copy players warns about profile identity" -Script {
+    New-Item -ItemType Directory -Path (Join-Path $savesDir $otherProfile) -Force | Out-Null
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-copy-players.ps1") -SourceProfileName $profile -TargetProfileName $otherProfile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
+} -Assert { param($text) $text -match "Profile identity warning" -and $text -match "client-local state" }
 
 if ($python) {
     Invoke-Checked -Name "reset hosted player what-if keeps row" -Script {

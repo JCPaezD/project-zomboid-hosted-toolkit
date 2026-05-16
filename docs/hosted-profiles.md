@@ -14,7 +14,35 @@ players.db.networkPlayers.world
 db.whitelist.world
 ```
 
-Renaming a hosted profile safely means keeping those pieces consistent.
+Renaming a hosted profile safely means keeping those pieces consistent, but consistency is not the whole story.
+
+## Profile Identity And Live Co-op Games
+
+A hosted profile name is also part of the practical identity that clients see over time. In active co-op games, changing the name of the profile/save can make Project Zomboid treat the game like a different hosted identity on each player's machine.
+
+That can detach or reset local client-side state such as:
+
+- explored in-game map or minimap state;
+- map symbols and thumbnails;
+- `InGameMap.ini` view state;
+- files under `Saves\Multiplayer\<profile>_player\`;
+- Build 42 `map_visited_server` handoff behavior, depending on the game build.
+
+For a valuable active co-op game, prefer this pattern:
+
+1. Back up the current profile.
+2. Keep the same active profile name.
+3. Edit mods, sandbox, or server settings in place.
+4. Keep version history in backup names, changelogs, or notes instead of renaming the live profile.
+
+Use a new profile name mainly for:
+
+- lab copies;
+- forked experiments;
+- disposable tests;
+- migration work where every player understands that local client files may need manual handling.
+
+The toolkit can rename/copy the host-side files it can see. It cannot automatically migrate client-local map state on another player's computer.
 
 ## Profile Export
 

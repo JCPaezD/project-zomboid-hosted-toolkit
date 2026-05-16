@@ -40,6 +40,9 @@ if ($IncludeProfileDb -and (Test-Path -LiteralPath $targetDb)) { $existing += $t
 Write-PZTStep "Source profile: $SourceProfileName ($sourceSaveName)" "pz-copy-world"
 Write-PZTStep "Target profile: $TargetProfileName ($targetSaveName)" "pz-copy-world"
 Write-PZTStep "Copy includes: save folder, players.db, map files$(if($IncludePlayerFolder){', _player folder'}else{''})$(if($IncludeProfileDb){', profile db'}else{''})" "pz-copy-world"
+Write-Host ""
+Write-Host "=== Profile identity warning ==="
+Write-PZTProfileIdentityWarning "pz-copy-world"
 $sourcePlayersDb = Join-Path $sourceSaveDir "players.db"
 $targetPlayersDb = Join-Path $targetSaveDir "players.db"
 $sourcePlayers = @(Get-PZTPlayersInfo -PlayersDb $sourcePlayersDb)

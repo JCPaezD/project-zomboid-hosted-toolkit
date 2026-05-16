@@ -51,6 +51,10 @@ isDead
 
 If you rename a profile and keep the save, `networkPlayers.world` may need to match the new profile name.
 
+This is only one identity link. Build 42 hosted/co-op games can also keep explored-map state under the save's `map_visited_server` folder, while clients may keep local state under their own `<profile>_player` folders. A host-side rename/copy can update the host's visible files but still leave another player's local client files associated with the old profile identity.
+
+For an active co-op game, prefer keeping the profile name stable and using backups for version history.
+
 ## Local Player Folder
 
 ```text
@@ -58,6 +62,18 @@ If you rename a profile and keep the save, `networkPlayers.world` may need to ma
 ```
 
 Hosted games can create this folder for local/connection state. Do not assume it is the only player state.
+
+It can include map-related files such as:
+
+```text
+InGameMap.ini
+map\
+map_symbols.bin
+serverid.dat
+thumb.png
+```
+
+These files are local to the machine that owns the folder. The host cannot automatically migrate another player's local `<profile>_player` folder when a profile name changes.
 
 ## Server Database
 

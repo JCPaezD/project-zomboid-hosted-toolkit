@@ -16,6 +16,7 @@ db\<profile>.db
 4. Do not use Workshop repairs to fix save/profile problems.
 5. Do not use save deletion to fix Workshop errors.
 6. Do not rewrite `.lua` or `.ini` files with tools that may insert UTF-8 BOM.
+7. For active co-op games, keep the active profile name stable when possible. Use backups for version history.
 
 ## Recommended Flow Before Experiments
 
@@ -52,7 +53,7 @@ Restore/copy always starts with `-WhatIf`:
 .\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -WhatIf
 ```
 
-To copy a backup into a new profile name:
+To copy a backup into a new profile name for a lab/fork copy:
 
 ```powershell
 .\pz-toolkit.ps1 restore-profile -BackupPath ".\backups\profile-MyHostedServer-20260101-120000" -TargetProfileName "MyHostedServer_Copy" -WhatIf
@@ -61,6 +62,14 @@ To copy a backup into a new profile name:
 If the target already exists, the restore refuses to continue unless `-Overwrite` is passed. When `-Overwrite` is used, the current target is backed up first.
 
 When copying to a new profile name, `restore-profile` renames the restored server files, save folder, optional `_player` folder, profile database, and hosted player `world` rows in `players.db`. It also updates `PublicName` when the old value exactly matches the source profile name.
+
+Do not treat that as a fully transparent rename for a valuable live co-op game. Other players can have client-local folders tied to the old hosted profile identity. Those folders may contain explored map data, symbols, thumbnails, `InGameMap.ini`, or other per-client files the host cannot migrate automatically.
+
+Recommended interpretation:
+
+- same target profile name: restore/recover the active identity;
+- new target profile name: lab copy, fork, disposable test, or advanced migration;
+- live co-op mod/config change: back up, then edit the same profile in place.
 
 Real direct-script restore/copy/reset operations require explicit confirmation flags after you review `-WhatIf` output:
 

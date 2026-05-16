@@ -44,6 +44,8 @@ This document defines the intended scope, safety model, and design boundaries fo
 - An initial Spanish interactive layer is available for the guided menu and common human-facing prompts.
 - Hosted profile names and save folder names can differ; tools resolve the active save folder when world/player operations need it.
 - Restore/copy from backup is supported for toolkit-created backup folders. Backups from other layouts may need manual inspection.
+- Copying or restoring to a different profile name is considered a lab/fork workflow. It updates host-side files the toolkit can see, but it cannot guarantee continuity for client-local state on other players' machines.
+- For active co-op games, the safer operational model is stable profile identity plus backups and in-place edits.
 - Sandbox comparison favors readability by summarizing sections that only exist in one profile. Full detail is still available through flags or CSV export.
 - Backup manifests list file sizes by default for speed. SHA256 hashes are optional through `-HashManifest` because large PZ saves can contain many thousands of files.
 - MIT is the default license for public reuse.
@@ -63,5 +65,5 @@ This document defines the intended scope, safety model, and design boundaries fo
 - Improve diagnostics for common Workshop/update failure patterns.
 - Add more automated tests and representative fixtures.
 - Improve support/debug exports for issue reports.
-- Add a safe hosted profile rename flow if repeated real-world cases justify it.
+- Add explicit map-state inspection/migration helpers if repeated real-world cases justify them.
 - Polish documentation from hosted/co-op troubleshooting cases.

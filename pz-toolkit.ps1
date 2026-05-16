@@ -179,9 +179,9 @@ function Read-ToolkitActionChoice {
         [pscustomobject]@{ Key = "10"; Group = "Compare"; GroupEs = "Comparar"; Label = "Compare mods / workshop / maps"; LabelEs = "Comparar mods/workshop/mapas"; Description = "Compares Mods, WorkshopItems, and Map lists between profiles."; DescriptionEs = "Compara Mods, WorkshopItems y Map entre perfiles." },
         [pscustomobject]@{ Key = "11"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Back up a hosted profile"; LabelEs = "Crear backup de perfil"; Description = "Copies profile files, save, player folder, and DB into a COMPLETE-marked backup."; DescriptionEs = "Copia perfil, save, carpeta player y DB a un backup marcado COMPLETE." },
         [pscustomobject]@{ Key = "12"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Verify a backup folder"; LabelEs = "Verificar backup"; Description = "Checks backup status and expected files before relying on it."; DescriptionEs = "Comprueba estado y archivos esperados antes de confiar en un backup." },
-        [pscustomobject]@{ Key = "13"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Restore or copy a profile from backup"; LabelEs = "Restaurar/copiar backup"; Description = "Restores a backup or copies it into a new profile name."; DescriptionEs = "Restaura un backup o lo copia con un nombre de perfil nuevo." },
-        [pscustomobject]@{ Key = "14"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy world/save to another profile (WhatIf first)"; LabelEs = "Copiar mundo a otro perfil"; Description = "Transfers world/save data between existing profiles after showing impact."; DescriptionEs = "Transfiere mundo/save entre perfiles existentes mostrando impacto antes." },
-        [pscustomobject]@{ Key = "15"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy players to another profile (WhatIf first)"; LabelEs = "Copiar jugadores"; Description = "Transfers players.db and optional _player folder after showing player impact."; DescriptionEs = "Transfiere players.db y _player mostrando impacto de jugadores antes." },
+        [pscustomobject]@{ Key = "13"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Restore backup / create lab copy"; LabelEs = "Restaurar / copia lab"; Description = "Restore in place, or create a lab/fork copy; new names can detach client-local map state."; DescriptionEs = "Restaura in-place o crea copia lab/fork; nombres nuevos pueden desenganchar mapas locales." },
+        [pscustomobject]@{ Key = "14"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy world/save to another profile (lab/fork)"; LabelEs = "Copiar mundo a otro perfil"; Description = "Transfers world/save data; prefer same profile name for active co-op continuity."; DescriptionEs = "Transfiere mundo/save; para co-op activo prefiere mantener el mismo nombre." },
+        [pscustomobject]@{ Key = "15"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy players to another profile (lab/fork)"; LabelEs = "Copiar jugadores"; Description = "Transfers players.db/_player; other clients may need local map handling after a profile-name change."; DescriptionEs = "Transfiere players.db/_player; otros clientes pueden requerir ajuste local de mapa." },
         [pscustomobject]@{ Key = "16"; Group = "Export"; GroupEs = "Exportar"; Label = "Export profile mod/map lists"; LabelEs = "Exportar perfil"; Description = "Writes profile lists and summaries under exports for sharing or review."; DescriptionEs = "Genera listas y resumenes bajo exports para compartir o revisar." },
         [pscustomobject]@{ Key = "17"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset selected profile world/map (WhatIf first)"; LabelEs = "Resetear mundo/mapa"; Description = "Moves world/save data aside so PZ creates a fresh world on next launch."; DescriptionEs = "Mueve el mundo/save para que PZ cree un mundo nuevo al lanzar." },
         [pscustomobject]@{ Key = "18"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset one hosted player (WhatIf first)"; LabelEs = "Resetear jugador"; Description = "Deletes one hosted player row after backup and confirmation."; DescriptionEs = "Elimina una fila de jugador tras backup y confirmacion." },
@@ -370,9 +370,9 @@ function Show-Menu {
             "Compare mods / workshop / maps" = "Comparar mods/workshop/mapas"
             "Back up a hosted profile" = "Crear backup de perfil"
             "Verify a backup folder" = "Verificar backup"
-            "Restore or copy a profile from backup" = "Restaurar/copiar backup"
-            "Copy world/save to another profile (WhatIf first)" = "Copiar mundo a otro perfil"
-            "Copy players to another profile (WhatIf first)" = "Copiar jugadores"
+            "Restore backup / create lab copy" = "Restaurar / copia lab"
+            "Copy world/save to another profile (lab/fork)" = "Copiar mundo a otro perfil"
+            "Copy players to another profile (lab/fork)" = "Copiar jugadores"
             "Export profile mod/map lists" = "Exportar perfil"
             "Reset selected profile world/map (WhatIf first)" = "Resetear mundo/mapa"
             "Reset one hosted player (WhatIf first)" = "Resetear jugador"
@@ -471,7 +471,7 @@ function Show-Menu {
                 if (-not $right) { continue }
                 Invoke-ToolkitCommand -Name "compare-mods" -Args @("-LeftProfile", $left, "-RightProfile", $right)
             }
-            "Copy world/save to another profile (WhatIf first)" {
+            "Copy world/save to another profile (lab/fork)" {
                 Write-ToolkitPrepTitle "Preparing - Copy world/save" "Preparando - Copiar mundo/save"
                 $source = Read-ToolkitRequiredProfile -Prompt $(if ((Get-PZTLanguage) -eq "es") { "Elige perfil origen" } else { "Choose source profile" })
                 if (-not $source) { continue }
@@ -485,7 +485,7 @@ function Show-Menu {
                     Invoke-ToolkitCommand -Name "copy-world" -Args $realArgs
                 }
             }
-            "Copy players to another profile (WhatIf first)" {
+            "Copy players to another profile (lab/fork)" {
                 Write-ToolkitPrepTitle "Preparing - Copy players" "Preparando - Copiar jugadores"
                 $source = Read-ToolkitRequiredProfile -Prompt $(if ((Get-PZTLanguage) -eq "es") { "Elige perfil origen" } else { "Choose source profile" })
                 if (-not $source) { continue }
@@ -517,11 +517,12 @@ function Show-Menu {
                     Invoke-ToolkitCommand -Name "export-profile" -Args @("-ProfileName", $profile, "-OutputDir", $out)
                 }
             }
-            "Restore or copy a profile from backup" {
+            "Restore backup / create lab copy" {
                 Write-ToolkitPrepTitle "Preparing - Restore or copy profile" "Preparando - Restaurar/copiar perfil"
                 $backup = Read-ToolkitBackupPath
                 if ($backup) {
-                    $targetPrompt = if ((Get-PZTLanguage) -eq "es") { "Nombre de perfil destino (en blanco para restaurar nombre original)" } else { "Target profile name (leave blank to restore original name)" }
+                    Write-PZTProfileIdentityWarning "pz-toolkit"
+                    $targetPrompt = if ((Get-PZTLanguage) -eq "es") { "Nombre destino (en blanco para restaurar el nombre original; recomendado para partida viva)" } else { "Target name (blank restores original name; recommended for a live game)" }
                     $target = Read-Host $targetPrompt
                     $sourceFromBackup = Get-ToolkitBackupSourceProfileName -BackupPath $backup
                     $effectiveTarget = if ($target) { $target } else { $sourceFromBackup }
