@@ -297,6 +297,43 @@ Invoke-Checked -Name "quick diagnosis detects workshop update lock" -Script {
     & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
 } -Assert { param($text) $text -match '"Area":\s+"Workshop update lock"' -and $text -match '"WorkshopId":\s+"123"' -and $text -match '"StagedDownloadFolder":\s+false' }
 
+Set-TestText -Path (Join-Path $logsDir "2026-01-01_15-00_DebugLog-server.txt") -Content @"
+LOG  : ConnectToServerState: GetItemState()=None ID=3724831368
+LOG  : ConnectToServerState: item state CheckItemState -> SubscribePending ID=3724831368
+LOG  : ConnectToServerState: onItemNotSubscribed itemID=3724831368 result=15
+LOG  : ConnectToServerState: item state SubscribePending -> Fail ID=3724831368
+"@
+
+Invoke-Checked -Name "find latest error detects workshop subscription failure" -Script {
+    & (Join-Path $root "tools\pz-find-latest-error.ps1") -ZomboidRoot $zRoot -ServerOnly -Json
+} -Assert { param($text) $text -match "WorkshopSubscriptionFailure" -and $text -notmatch "WorkshopUpdate" }
+
+Invoke-Checked -Name "quick diagnosis detects workshop subscription failure" -Script {
+    & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
+} -Assert { param($text) $text -match '"Area":\s+"Workshop subscription failure"' -and $text -match '"WorkshopId":\s+"3724831368"' -and $text -match '"ResultCode":\s+"15"' }
+
+Invoke-Checked -Name "repair workshop does not repair subscription failure" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-repair-workshop-redownload.ps1") -ZomboidRoot $zRoot -WorkshopRoot $workshopRoot -BackupRoot $backupRoot -WhatIf 2>&1 | Out-String
+} -Assert { param($text) $text -match "Workshop subscription failure detected" -and $text -match "not a staged redownload/cache repair case" -and $text -match "Nothing was changed" }
+
+Set-TestText -Path (Join-Path $logsDir "2026-01-01_16-00_DebugLog-server.txt") -Content @"
+LOG  : Workshop: GetItemState()=Installed|NeedsUpdate ID=123
+LOG  : Workshop: onItemNotDownloaded itemID=123 result=33
+LOG  : ConnectToServerState: GetItemState()=None ID=3724831368
+LOG  : ConnectToServerState: onItemNotSubscribed itemID=3724831368 result=15
+LOG  : ConnectToServerState: item state SubscribePending -> Fail ID=3724831368
+"@
+
+Invoke-Checked -Name "quick diagnosis separates mixed workshop update and subscription IDs" -Script {
+    & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
+} -Assert { param($text) $text -match '"WorkshopId":\s+"123"' -and $text -match '"UpdateSignal":\s+true' -and $text -match '"LatestWorkshopSubscriptionFailure"' -and $text -match '"WorkshopId":\s+"3724831368"' }
+
+Invoke-Checked -Name "repair workshop blocks mixed log when latest issue is subscription failure" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-repair-workshop-redownload.ps1") -ZomboidRoot $zRoot -WorkshopRoot $workshopRoot -BackupRoot $backupRoot -WhatIf 2>&1 | Out-String
+} -Assert { param($text) $text -match "Workshop subscription failure detected" -and $text -match "3724831368" -and $text -notmatch "Detected Workshop ID from log: 123" }
+
 Invoke-Checked -Name "inspect blam reports problem chunk" -Script {
     & (Join-Path $root "tools\pz-inspect-blam.ps1") -ProfileName $profile -ZomboidRoot $zRoot
 } -Assert { param($text) $text -match "TestProfile" -and $text -match "10" -and $text -match "20" }

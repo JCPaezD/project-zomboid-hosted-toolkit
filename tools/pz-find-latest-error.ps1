@@ -30,6 +30,7 @@ if ($IncludeMapLogs) {
 function Get-PZTLogCategory {
     param([Parameter(Mandatory=$true)][string]$Line)
 
+    if ($Line -match "onItemNotSubscribed|SubscribePending\s+->\s+Fail|GetItemState\(\)=None") { return "WorkshopSubscriptionFailure" }
     if ($Line -match "Installed\|NeedsUpdate|Workshop DownloadPending|GetItemState") { return "WorkshopUpdate" }
     if ($Line -match "FileSystemException|being used by another process|AccessDeniedException") { return "LockedFile" }
     if ($Line -match "UI_ServerStatus_Terminated|NormalTermination|Exiting due to errors|server terminated") { return "Termination" }
@@ -91,6 +92,9 @@ $patterns = @(
     "ReceiveModData",
     "ReceiveModDataPacket",
     "ObjectModDataPacket\.parse",
+    "onItemNotSubscribed",
+    "SubscribePending\s+->\s+Fail",
+    "GetItemState\(\)=None",
     "Installed\|NeedsUpdate",
     "result=33",
     "FileSystemException",
@@ -151,7 +155,11 @@ function Get-PZTRecommendations {
     $recommendations = New-Object System.Collections.Generic.List[string]
     $es = ($Language -eq "es")
 
-    if ($names -contains "WorkshopUpdate") {
+    if ($names -contains "WorkshopSubscriptionFailure") {
+        if ($es) { $recommendations.Add("Hay fallo de suscripcion/acceso a Workshop en cliente. Busca el Workshop ID, abre su URL de Steam y comprueba si el item fue retirado, es privado o Steam no puede suscribirlo. No uses repair-workshop para este caso; si hay que quitar/reemplazar el mod, haz backup y prueba en copia si es una partida viva.") }
+        else { $recommendations.Add("A client Workshop subscription/access failure was found. Identify the Workshop ID, open its Steam URL, and check whether the item was removed, private, or Steam cannot subscribe to it. Do not use repair-workshop for this case; if you remove/replace the mod, back up and test on a copy for live saves.") }
+    }
+    if ($names -contains "WorkshopUpdate" -and -not ($names -contains "WorkshopSubscriptionFailure")) {
         if ($es) { $recommendations.Add("Se han encontrado senales de actualizacion/cache de Workshop. Revisa primero los mods globales del cliente; usa repair-workshop solo si el log contiene Installed|NeedsUpdate y Steam preparo carpeta downloads.") }
         else { $recommendations.Add("Workshop update/cache signals were found. Check client global mods first, then use repair-workshop only if the log contains Installed|NeedsUpdate and Steam prepared a downloads folder.") }
     }
@@ -245,11 +253,12 @@ if ($summary.MatchCount -eq 0) {
 
 Write-Host ""
 if ($lang -eq "es") { Write-Host "=== Hallazgos clave ===" } else { Write-Host "=== Key findings ===" }
-$priority = @("Termination","WorkshopUpdate","LockedFile","ProblemChunk","SavedObjectLoad","MemoryPressure","AnimalPopulation","ReceiveModData","ObjectModData","EncodingLoadError","MissingFluid","LuaException","JavaException","BrokenDistribution","NetChecksumNullPath","GenericError")
+$priority = @("Termination","WorkshopSubscriptionFailure","WorkshopUpdate","LockedFile","ProblemChunk","SavedObjectLoad","MemoryPressure","AnimalPopulation","ReceiveModData","ObjectModData","EncodingLoadError","MissingFluid","LuaException","JavaException","BrokenDistribution","NetChecksumNullPath","GenericError")
 foreach ($name in $priority) {
     $cat = $summary.Categories | Where-Object { $_.Category -eq $name } | Select-Object -First 1
     if ($cat) {
         switch ($name) {
+            "WorkshopSubscriptionFailure" { Write-Host ("- WorkshopSubscriptionFailure ({0}): {1}" -f $cat.Count, $(if ($lang -eq "es") { "cliente no pudo suscribirse/acceder a un item Workshop; comprueba URL/retirada/privacidad." } else { "client could not subscribe/access a Workshop item; check URL/removal/privacy." })) }
             "ProblemChunk" { Write-Host ("- ProblemChunk ({0}): {1}" -f $cat.Count, $(if ($lang -eq "es") { "problema de carga/CRC de chunk; inspecciona blam y map logs primero." } else { "chunk load/CRC issue; inspect blam and map logs first." })) }
             "MemoryPressure" { Write-Host ("- MemoryPressure ({0}): {1}" -f $cat.Count, $(if ($lang -eq "es") { "senal RAM/OOM; revisa si lo disparan chunks malos o zonas densas." } else { "RAM/OOM signal; check whether bad chunks or dense areas triggered it." })) }
             "ReceiveModData" { Write-Host ("- ReceiveModData ({0}): {1}" -f $cat.Count, $(if ($lang -eq "es") { "errores de sincronizacion de objetos; puede haber coordenadas cerca en el log." } else { "world-object sync errors; useful coordinates may be nearby in the log." })) }

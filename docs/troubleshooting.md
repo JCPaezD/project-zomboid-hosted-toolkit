@@ -39,6 +39,35 @@ If `repair-workshop` says the prepared download folder was not found, the staged
 
 If the issue happens after a long session and another player sees a mod-version mismatch, treat it as a sync/update problem first: stop hosting, have every player close PZ, let Steam finish Workshop updates, then relaunch the host. Only suspect save corruption if logs also show chunk, CRC, saved-object, or repeated runtime errors after the Workshop state is clean.
 
+## Client Fails To Subscribe To A Workshop Item
+
+Common client-side symptoms:
+
+- the join screen shows a required mod as unnamed, `0MB`, or not subscribed;
+- PZ says it failed to subscribe to a Workshop item;
+- one player cannot download a required mod while the host and other players can.
+
+Useful log patterns:
+
+```text
+GetItemState()=None ID=<WorkshopID>
+SubscribePending ID=<WorkshopID>
+onItemNotSubscribed itemID=<WorkshopID> result=<code>
+SubscribePending -> Fail ID=<WorkshopID>
+```
+
+This is different from a host-side Workshop redownload/cache issue. There may be no local `workshop\downloads\108600\<id>` folder to repair. The item may have been removed from Workshop, made private, blocked by Steam, or temporarily unavailable to that client's account/region/cache.
+
+First checks:
+
+1. Ask the affected player for `console.txt` or the latest `DebugLog.txt`.
+2. Run `quick-diagnosis` or `latest-error` against those logs if copied locally.
+3. Open `https://steamcommunity.com/sharedfiles/filedetails/?id=<WorkshopID>`.
+4. If the item is removed/private/unavailable, back up first, then remove or replace that Workshop ID in the hosted profile and collection. For live saves, test the removal/replacement on a copy when possible.
+5. If the item still exists, have the affected player close PZ, restart Steam, wait for downloads, and subscribe manually from the Workshop page.
+
+Do not use `repair-workshop` for this pattern. `repair-workshop` intentionally handles only staged redownload/cache folders for already resolvable Workshop items.
+
 ## Client Global Mods Block Hosted Server Updates
 
 The in-game single-player Mods menu can leave active mods in:

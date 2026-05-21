@@ -35,6 +35,7 @@ Use WhatIf/dry-run first for repair, reset, copy, restore, and cleanup actions.
 - Exporting mod, Workshop, map, server setting, sandbox, and player summaries for review.
 - Clearing the global client mod list left by the single-player Mods menu.
 - Diagnosing common Workshop update/redownload/reinstalling failures.
+- Identifying client-side Workshop subscription failures, including unnamed `0MB` items and removed/private Workshop IDs.
 - Repairing a narrow Workshop staged-download case safely when the required cache exists.
 - Inspecting Build 42 `blam` chunk-load markers without touching the save.
 - Copying world/save data or player data between existing hosted profiles with backups.
@@ -222,6 +223,8 @@ Repair a specific Workshop redownload/cache case:
 .\pz-toolkit.ps1 repair-workshop -ConfirmRepair
 ```
 
+`repair-workshop` does not fix removed, private, or inaccessible Workshop items. If logs show `onItemNotSubscribed`, `GetItemState()=None`, or `SubscribePending -> Fail`, use `quick-diagnosis`/`latest-error` to identify the Workshop ID, then verify the Steam page. If you remove or replace the item in a live profile, back up first and test on a copy when possible.
+
 You can still call any script directly under `tools\` if you prefer. The root `pz-toolkit.ps1` hub supports both modes:
 
 - interactive mode for common manual operations and profile/backup selection;
@@ -249,8 +252,8 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | `tools/pz-compare-mods.ps1` | Compare `Mods`, `WorkshopItems`, and `Map` lists between two hosted profiles, with compact defaults and detailed mode. |
 | `tools/pz-copy-world.ps1` | Copy one profile's save/world data into another existing profile for lab/fork workflows, with safety backup on overwrite. |
 | `tools/pz-copy-players.ps1` | Copy hosted player rows and optional `_player` folder from one profile to another for lab/fork workflows. |
-| `tools/pz-find-latest-error.ps1` | Search latest PZ logs for common failure patterns. |
-| `tools/pz-repair-workshop-redownload.ps1` | Conservative repair for `Installed|NeedsUpdate` plus prepared Workshop download cache. |
+| `tools/pz-find-latest-error.ps1` | Search latest PZ logs for common failure patterns, including Workshop update/cache and subscription/access failures. |
+| `tools/pz-repair-workshop-redownload.ps1` | Conservative repair for `Installed|NeedsUpdate` plus prepared Workshop download cache; not for removed/private/inaccessible Workshop items. |
 
 ## Safety Levels
 

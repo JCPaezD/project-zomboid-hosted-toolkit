@@ -34,7 +34,7 @@ if (Test-Path -LiteralPath $paths.LogsDir) {
         Select-Object -First 1
     if ($latestDebug) {
         $latestDebugText = Get-Content -LiteralPath $latestDebug.FullName -Raw
-        $knownPatterns = "ERROR|Exception|UI_ServerStatus_Terminated|Installed\|NeedsUpdate|Installed status but timeUpdated|DownloadPending|onItemNotDownloaded|CRC mismatch|SANITY CHECK FAIL|Error loading chunk|OutOfMemoryError|ReceiveModData|ObjectModDataPacket|MalformedInputException|FileSystemException|being used by another process|está siendo utilizado por otro proceso|El proceso no tiene acceso al archivo"
+        $knownPatterns = "ERROR|Exception|UI_ServerStatus_Terminated|Installed\|NeedsUpdate|Installed status but timeUpdated|DownloadPending|onItemNotDownloaded|onItemNotSubscribed|SubscribePending\s+->\s+Fail|GetItemState\(\)=None|CRC mismatch|SANITY CHECK FAIL|Error loading chunk|OutOfMemoryError|ReceiveModData|ObjectModDataPacket|MalformedInputException|FileSystemException|being used by another process|está siendo utilizado por otro proceso|El proceso no tiene acceso al archivo"
         $logItems = @(Select-String -LiteralPath $latestDebug.FullName -Pattern $knownPatterns -ErrorAction SilentlyContinue | Select-Object -Last 8)
     }
 }
@@ -66,6 +66,29 @@ function Get-PZTLatestWorkshopIdFromText {
     if ($matches.Count -eq 0) { return $null }
 
     return $matches[$matches.Count - 1].Groups[1].Value
+}
+
+function Get-PZTLatestWorkshopUpdateIssueFromText {
+    param([string]$Text)
+    if (-not $Text) { return $null }
+
+    $matches = [regex]::Matches($Text, "ID=(\d+).*?(Installed\|NeedsUpdate|DownloadPending|result=33)|Installed\|NeedsUpdate.*?ID=(\d+)|onItemNotDownloaded itemID=(\d+) result=33")
+    if ($matches.Count -eq 0) { return $null }
+
+    $match = $matches[$matches.Count - 1]
+    $id = $null
+    foreach ($groupIndex in @(1,3,4)) {
+        if ($match.Groups[$groupIndex].Success -and $match.Groups[$groupIndex].Value) {
+            $id = $match.Groups[$groupIndex].Value
+            break
+        }
+    }
+    if (-not $id) { return $null }
+
+    [pscustomobject]@{
+        WorkshopId = $id
+        Index = $match.Index
+    }
 }
 
 function Get-PZTWorkshopRootsForDiagnosis {
@@ -136,7 +159,9 @@ else {
     Add-PZTDiagFinding "OK" "Problem chunks" "No blam error files found in Saves/Multiplayer."
 }
 
-$latestWorkshopId = Get-PZTLatestWorkshopIdFromText -Text $latestDebugText
+$latestWorkshopUpdateIssue = Get-PZTLatestWorkshopUpdateIssueFromText -Text $latestDebugText
+$latestWorkshopId = if ($latestWorkshopUpdateIssue) { $latestWorkshopUpdateIssue.WorkshopId } else { $null }
+$subscriptionFailure = Get-PZTWorkshopSubscriptionFailure -Text $latestDebugText
 $hasWorkshopUpdateSignal = $false
 $hasLockedWorkshopSignal = $false
 $hasStagedDownload = $false
@@ -154,6 +179,11 @@ if ($hasWorkshopUpdateSignal -and $hasLockedWorkshopSignal) {
 elseif ($hasWorkshopUpdateSignal) {
     $idText = if ($latestWorkshopId) { " Last Workshop ID seen: $latestWorkshopId." } else { "" }
     Add-PZTDiagFinding "Warning" "Workshop update/cache" "The latest server log shows Workshop update/cache signals.$idText Use latest-error, then repair-workshop only if a staged download folder exists."
+}
+
+if ($subscriptionFailure) {
+    $codeText = if ($subscriptionFailure.ResultCode) { " Steam/PZ result code $($subscriptionFailure.ResultCode)." } else { "" }
+    Add-PZTDiagFinding "Warning" "Workshop subscription failure" "A client failed to subscribe/access Workshop ID $($subscriptionFailure.WorkshopId).$codeText Check $($subscriptionFailure.Url). If the item is removed/private/unavailable, remove or replace it in the hosted profile after backup; repair-workshop does not apply."
 }
 
 if ($logItems.Count -gt 0) {
@@ -183,6 +213,7 @@ $result = [pscustomobject]@{
         StagedDownloadFolder = $hasStagedDownload
         LogPath = if ($latestDebug) { $latestDebug.FullName } else { $null }
     }
+    LatestWorkshopSubscriptionFailure = $subscriptionFailure
 }
 
 if ($Json) {
@@ -212,6 +243,7 @@ Write-Host ""
 if ($lang -eq "es") {
     Write-Host "Siguientes comprobaciones sugeridas:"
     Write-Host "- Si Client global mods aparece como Warning, ejecuta clear-client-mods antes de alojar."
+    Write-Host "- Si Workshop subscription failure aparece como Warning, abre la URL del item, comprueba si fue retirado/privado y no uses repair-workshop; haz backup antes de quitar/reemplazar mods."
     Write-Host "- Si Workshop update lock aparece como Warning, cierra PZ/ZombieBuddy/Java, espera a Steam y reintenta una vez."
     Write-Host "- Si Workshop update lock se repite y existe carpeta staged download, ejecuta primero repair-workshop -WhatIf."
     Write-Host "- Si Latest server log aparece como Warning, ejecuta latest-error incluyendo map logs."
@@ -221,6 +253,7 @@ if ($lang -eq "es") {
 else {
     Write-Host "Suggested next checks:"
     Write-Host "- If Client global mods is Warning, run clear-client-mods before hosting."
+    Write-Host "- If Workshop subscription failure is Warning, open the item URL, check whether it was removed/private, and do not use repair-workshop; back up before removing/replacing mods."
     Write-Host "- If Workshop update lock is Warning, close PZ/ZombieBuddy/Java, wait for Steam downloads to finish, then retry once."
     Write-Host "- If Workshop update lock still repeats and a staged download folder exists, run repair-workshop -WhatIf first."
     Write-Host "- If Latest server log is Warning, run latest-error with map logs enabled."

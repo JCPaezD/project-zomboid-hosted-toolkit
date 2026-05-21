@@ -19,20 +19,32 @@ function Get-LatestServerLog {
         Select-Object -First 1
 }
 
-function Get-ItemIdFromLog {
+function Get-RepairableWorkshopIssueFromLog {
     param([string]$LogPath)
     $text = Get-Content -LiteralPath $LogPath -Raw
     $matches = [regex]::Matches($text, "ID=(\d+).*?(Installed\|NeedsUpdate|DownloadPending|result=33)|Installed\|NeedsUpdate.*?ID=(\d+)|onItemNotDownloaded itemID=(\d+) result=33")
-    if ($matches.Count -eq 0) {
-        return $null
-    }
+    if ($matches.Count -eq 0) { return $null }
+
     $match = $matches[$matches.Count - 1]
+    $id = $null
     foreach ($groupIndex in @(1,3,4)) {
         if ($match.Groups[$groupIndex].Success -and $match.Groups[$groupIndex].Value) {
-            return $match.Groups[$groupIndex].Value
+            $id = $match.Groups[$groupIndex].Value
+            break
         }
     }
-    return $null
+    if (-not $id) { return $null }
+
+    [pscustomobject]@{
+        WorkshopId = $id
+        Index = $match.Index
+    }
+}
+
+function Get-SubscriptionFailureFromLog {
+    param([string]$LogPath)
+    if (-not $LogPath -or -not (Test-Path -LiteralPath $LogPath)) { return $null }
+    Get-PZTWorkshopSubscriptionFailure -Text (Get-Content -LiteralPath $LogPath -Raw)
 }
 
 function Get-WorkshopRootCandidates {
@@ -88,14 +100,26 @@ $latest = $null
 if (-not $ItemId) {
     $latest = Get-LatestServerLog -LogsDir $paths.LogsDir
     if (-not $latest) { throw "No server logs found under $($paths.LogsDir)" }
-    $ItemId = Get-ItemIdFromLog -LogPath $latest.FullName
+    $repairableIssue = Get-RepairableWorkshopIssueFromLog -LogPath $latest.FullName
+    $subscriptionFailure = Get-SubscriptionFailureFromLog -LogPath $latest.FullName
     Write-PZTStep "Latest server log: $($latest.FullName)" "pz-repair-workshop"
-    if (-not $ItemId) {
+    if ($subscriptionFailure -and (-not $repairableIssue -or $subscriptionFailure.Index -gt $repairableIssue.Index)) {
+        Write-PZTStep "Workshop subscription failure detected for ID $($subscriptionFailure.WorkshopId)." "pz-repair-workshop"
+        if ($subscriptionFailure.ResultCode) { Write-PZTStep "Steam/PZ result code: $($subscriptionFailure.ResultCode)" "pz-repair-workshop" }
+        Write-PZTStep "URL: $($subscriptionFailure.Url)" "pz-repair-workshop"
+        Write-PZTStep "This is not a staged redownload/cache repair case. Check whether the item was removed, private, unavailable, or failing on the client's Steam account." "pz-repair-workshop"
+        Write-PZTStep "If removing or replacing the item in a live save, back up first and test on a copy when possible." "pz-repair-workshop"
+        Write-PZTStep "Nothing was changed." "pz-repair-workshop"
+        exit 0
+    }
+
+    if (-not $repairableIssue) {
         Write-PZTStep "No Installed|NeedsUpdate Workshop item was found." "pz-repair-workshop"
         Write-PZTStep "Nothing to repair with this tool." "pz-repair-workshop"
         Write-PZTStep "Use pz-find-latest-error.ps1 -ServerOnly to inspect other failure patterns." "pz-repair-workshop"
         exit 0
     }
+    $ItemId = $repairableIssue.WorkshopId
     Write-PZTStep "Detected Workshop ID from log: $ItemId ($($latest.FullName))" "pz-repair-workshop"
 }
 Assert-WorkshopItemIdSafe -Value $ItemId

@@ -67,6 +67,42 @@ function Get-PZTText {
     return $English
 }
 
+function Get-PZTWorkshopSubscriptionFailure {
+    param([string]$Text)
+    if (-not $Text) { return $null }
+
+    $patterns = @(
+        "onItemNotSubscribed\s+itemID=(\d+)\s+result=(\d+)",
+        "item\s+state\s+SubscribePending\s+->\s+Fail\s+ID=(\d+)",
+        "GetItemState\(\)=None\s+ID=(\d+)"
+    )
+
+    $events = New-Object System.Collections.Generic.List[object]
+    foreach ($pattern in $patterns) {
+        foreach ($match in [regex]::Matches($Text, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+            $resultCode = if ($match.Groups.Count -gt 2 -and $match.Groups[2].Success) { $match.Groups[2].Value } else { $null }
+            $events.Add([pscustomobject]@{
+                WorkshopId = $match.Groups[1].Value
+                ResultCode = $resultCode
+                Index = $match.Index
+                Pattern = $pattern
+            }) | Out-Null
+        }
+    }
+
+    if ($events.Count -eq 0) { return $null }
+    $latest = @($events | Sort-Object Index | Select-Object -Last 1)[0]
+    $result = @($events | Where-Object { $_.WorkshopId -eq $latest.WorkshopId -and $_.ResultCode } | Sort-Object Index | Select-Object -Last 1)
+
+    [pscustomobject]@{
+        WorkshopId = $latest.WorkshopId
+        ResultCode = if ($result.Count -gt 0) { $result[0].ResultCode } else { $null }
+        EventCount = $events.Count
+        Index = $latest.Index
+        Url = "https://steamcommunity.com/sharedfiles/filedetails/?id=$($latest.WorkshopId)"
+    }
+}
+
 function Write-PZTProfileIdentityWarning {
     param([string]$Scope = "pz-toolkit")
 

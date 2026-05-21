@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added detection for client-side Workshop subscription/access failures such as unnamed `0MB` mods, `GetItemState()=None`, `onItemNotSubscribed`, and `SubscribePending -> Fail`.
+- Updated quick diagnosis, latest-error, repair-workshop guardrails, docs, and smoke tests so removed/private/inaccessible Workshop items are not confused with staged redownload repair cases.
 - Reframed restore/copy-to-new-profile operations as lab/fork workflows rather than transparent live-game migrations.
 - Added profile identity warnings to restore, copy-world, and copy-players flows because changing hosted profile names can detach client-local state such as explored map, map symbols, thumbnails, and other per-client files.
 - Updated public docs to recommend stable profile names plus backups/in-place edits for active co-op games.
