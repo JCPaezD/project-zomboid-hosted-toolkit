@@ -23,10 +23,12 @@ $commands = @{
     "errors" = "pz-find-latest-error.ps1"
     "export-profile" = "pz-export-profile.ps1"
     "health-check" = "pz-health-check.ps1"
+    "inspect-auto-backups" = "pz-inspect-auto-backups.ps1"
     "inspect-profile" = "pz-inspect-profile.ps1"
     "inspect-blam" = "pz-inspect-blam.ps1"
     "quick-diagnosis" = "pz-quick-diagnosis.ps1"
     "repair-workshop" = "pz-repair-workshop-redownload.ps1"
+    "restore-auto-backup" = "pz-restore-auto-backup.ps1"
     "restore-profile" = "pz-restore-profile.ps1"
     "reset-player" = "pz-reset-hosted-player.ps1"
     "reset-world" = "pz-reset-hosted-world.ps1"
@@ -52,6 +54,8 @@ function Show-Help {
     Write-Host "  .\pz-toolkit.ps1 clear-client-mods -WhatIf"
     Write-Host "  .\pz-toolkit.ps1 backup-profile -ProfileName `"MyHostedServer`""
     Write-Host "  .\pz-toolkit.ps1 inspect-profile -ProfileName `"MyHostedServer`""
+    Write-Host "  .\pz-toolkit.ps1 inspect-auto-backups -ProfileName `"MyHostedServer`""
+    Write-Host "  .\pz-toolkit.ps1 restore-auto-backup -BackupZip `"C:/Users/you/Zomboid/backups/startup/backup_1.zip`" -WhatIf"
     Write-Host "  .\pz-toolkit.ps1 menu"
 }
 
@@ -129,6 +133,32 @@ function Read-ToolkitBackupPath {
     return $dirs[$index].FullName
 }
 
+function Read-ToolkitAutoBackupZip {
+    param([string]$ProfileName)
+
+    $paths = Get-PZTPaths
+    $items = @(Get-PZTAutoBackups -ZomboidRoot $paths.ZomboidRoot -Limit 30)
+    if ($ProfileName) {
+        $items = @($items | Where-Object { $_.ServerName -eq $ProfileName })
+    }
+    if ($items.Count -eq 0) {
+        $manual = if ((Get-PZTLanguage) -eq "es") { "Ruta del ZIP de backup automatico" } else { "Auto-backup ZIP path" }
+        return (Read-Host $manual)
+    }
+
+    $labels = @($items | ForEach-Object {
+        "{0,-7} {1,-12} {2,-18} {3,8:N2} MB  {4}" -f $_.Type, $_.Name, (Format-PZTAutoBackupTime -BackupInfo $_), $_.SizeMB, $_.ServerName
+    })
+    $labels += $(if ((Get-PZTLanguage) -eq "es") { "Escribir ruta manualmente" } else { "Type a ZIP path manually" })
+    $choice = Read-PZTMenuChoice -Prompt $(if ((Get-PZTLanguage) -eq "es") { "Elige backup automatico de PZ" } else { "Choose native PZ auto backup" }) -Items $labels -AllowCancel
+    if (-not $choice) { return $null }
+    if ($choice -eq "Type a ZIP path manually" -or $choice -eq "Escribir ruta manualmente") {
+        return (Read-Host $(if ((Get-PZTLanguage) -eq "es") { "Ruta del ZIP" } else { "ZIP path" }))
+    }
+    $index = [array]::IndexOf($labels, $choice)
+    return $items[$index].Path
+}
+
 function Get-ToolkitBackupSourceProfileName {
     param([Parameter(Mandatory=$true)][string]$BackupPath)
 
@@ -177,14 +207,16 @@ function Read-ToolkitActionChoice {
         [pscustomobject]@{ Key = "8"; Group = "Diagnose"; GroupEs = "Diagnostico"; Label = "Repair Workshop redownload issue (WhatIf)"; LabelEs = "Reparar redownload Workshop"; Description = "Targets the narrow Workshop staged-download/locked-file repair case."; DescriptionEs = "Caso concreto de reparacion de Workshop staged-download/archivo bloqueado." },
         [pscustomobject]@{ Key = "9"; Group = "Compare"; GroupEs = "Comparar"; Label = "Compare sandbox profiles"; LabelEs = "Comparar sandbox"; Description = "Compares SandboxVars between two hosted profiles."; DescriptionEs = "Compara SandboxVars entre dos perfiles hosted." },
         [pscustomobject]@{ Key = "10"; Group = "Compare"; GroupEs = "Comparar"; Label = "Compare mods / workshop / maps"; LabelEs = "Comparar mods/workshop/mapas"; Description = "Compares Mods, WorkshopItems, and Map lists between profiles."; DescriptionEs = "Compara Mods, WorkshopItems y Map entre perfiles." },
-        [pscustomobject]@{ Key = "11"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Back up a hosted profile"; LabelEs = "Crear backup de perfil"; Description = "Copies profile files, save, player folder, and DB into a COMPLETE-marked backup."; DescriptionEs = "Copia perfil, save, carpeta player y DB a un backup marcado COMPLETE." },
-        [pscustomobject]@{ Key = "12"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Verify a backup folder"; LabelEs = "Verificar backup"; Description = "Checks backup status and expected files before relying on it."; DescriptionEs = "Comprueba estado y archivos esperados antes de confiar en un backup." },
-        [pscustomobject]@{ Key = "13"; Group = "Backup / Restore"; GroupEs = "Backups"; Label = "Restore backup / create lab copy"; LabelEs = "Restaurar / copia lab"; Description = "Restore in place, or create a lab/fork copy; new names can detach client-local map state."; DescriptionEs = "Restaura in-place o crea copia lab/fork; nombres nuevos pueden desenganchar mapas locales." },
-        [pscustomobject]@{ Key = "14"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy world/save to another profile (lab/fork)"; LabelEs = "Copiar mundo a otro perfil"; Description = "Transfers world/save data; prefer same profile name for active co-op continuity."; DescriptionEs = "Transfiere mundo/save; para co-op activo prefiere mantener el mismo nombre." },
-        [pscustomobject]@{ Key = "15"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy players to another profile (lab/fork)"; LabelEs = "Copiar jugadores"; Description = "Transfers players.db/_player; other clients may need local map handling after a profile-name change."; DescriptionEs = "Transfiere players.db/_player; otros clientes pueden requerir ajuste local de mapa." },
-        [pscustomobject]@{ Key = "16"; Group = "Export"; GroupEs = "Exportar"; Label = "Export profile mod/map lists"; LabelEs = "Exportar perfil"; Description = "Writes profile lists and summaries under exports for sharing or review."; DescriptionEs = "Genera listas y resumenes bajo exports para compartir o revisar." },
-        [pscustomobject]@{ Key = "17"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset selected profile world/map (WhatIf first)"; LabelEs = "Resetear mundo/mapa"; Description = "Moves world/save data aside so PZ creates a fresh world on next launch."; DescriptionEs = "Mueve el mundo/save para que PZ cree un mundo nuevo al lanzar." },
-        [pscustomobject]@{ Key = "18"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset one hosted player (WhatIf first)"; LabelEs = "Resetear jugador"; Description = "Deletes one hosted player row after backup and confirmation."; DescriptionEs = "Elimina una fila de jugador tras backup y confirmacion." },
+        [pscustomobject]@{ Key = "11"; Group = "Native PZ Backups"; GroupEs = "Backups auto PZ"; Label = "Inspect native PZ auto backups"; LabelEs = "Inspeccionar backups auto PZ"; Description = "Lists native startup/version/period ZIPs and their restore-relevant profile contents."; DescriptionEs = "Lista ZIPs nativos startup/version/period y su contenido relevante para restaurar." },
+        [pscustomobject]@{ Key = "12"; Group = "Native PZ Backups"; GroupEs = "Backups auto PZ"; Label = "Restore native PZ auto backup (WhatIf first)"; LabelEs = "Restaurar backup auto PZ"; Description = "Selective in-place rollback from a native PZ ZIP; never extracts global folders."; DescriptionEs = "Rollback selectivo in-place desde ZIP nativo; nunca extrae carpetas globales." },
+        [pscustomobject]@{ Key = "13"; Group = "Toolkit Backups"; GroupEs = "Backups toolkit"; Label = "Back up a hosted profile"; LabelEs = "Crear backup de perfil"; Description = "Copies profile files, save, player folder, and DB into a COMPLETE-marked backup."; DescriptionEs = "Copia perfil, save, carpeta player y DB a un backup marcado COMPLETE." },
+        [pscustomobject]@{ Key = "14"; Group = "Toolkit Backups"; GroupEs = "Backups toolkit"; Label = "Verify a backup folder"; LabelEs = "Verificar backup"; Description = "Checks backup status and expected files before relying on it."; DescriptionEs = "Comprueba estado y archivos esperados antes de confiar en un backup." },
+        [pscustomobject]@{ Key = "15"; Group = "Toolkit Backups"; GroupEs = "Backups toolkit"; Label = "Restore backup / create lab copy"; LabelEs = "Restaurar / copia lab"; Description = "Restore in place, or create a lab/fork copy; new names can detach client-local map state."; DescriptionEs = "Restaura in-place o crea copia lab/fork; nombres nuevos pueden desenganchar mapas locales." },
+        [pscustomobject]@{ Key = "16"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy world/save to another profile (lab/fork)"; LabelEs = "Copiar mundo a otro perfil"; Description = "Transfers world/save data; prefer same profile name for active co-op continuity."; DescriptionEs = "Transfiere mundo/save; para co-op activo prefiere mantener el mismo nombre." },
+        [pscustomobject]@{ Key = "17"; Group = "Transfer"; GroupEs = "Transferir"; Label = "Copy players to another profile (lab/fork)"; LabelEs = "Copiar jugadores"; Description = "Transfers players.db/_player; other clients may need local map handling after a profile-name change."; DescriptionEs = "Transfiere players.db/_player; otros clientes pueden requerir ajuste local de mapa." },
+        [pscustomobject]@{ Key = "18"; Group = "Export"; GroupEs = "Exportar"; Label = "Export profile mod/map lists"; LabelEs = "Exportar perfil"; Description = "Writes profile lists and summaries under exports for sharing or review."; DescriptionEs = "Genera listas y resumenes bajo exports para compartir o revisar." },
+        [pscustomobject]@{ Key = "19"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset selected profile world/map (WhatIf first)"; LabelEs = "Resetear mundo/mapa"; Description = "Moves world/save data aside so PZ creates a fresh world on next launch."; DescriptionEs = "Mueve el mundo/save para que PZ cree un mundo nuevo al lanzar." },
+        [pscustomobject]@{ Key = "20"; Group = "Danger Zone"; GroupEs = "Zona peligrosa"; Label = "Reset one hosted player (WhatIf first)"; LabelEs = "Resetear jugador"; Description = "Deletes one hosted player row after backup and confirmation."; DescriptionEs = "Elimina una fila de jugador tras backup y confirmacion." },
         [pscustomobject]@{ Key = "H"; Group = "Help"; GroupEs = "Ayuda"; Label = "Show command help"; LabelEs = "Mostrar ayuda"; Description = "Shows command-mode usage and examples."; DescriptionEs = "Muestra uso por comandos y ejemplos." },
         [pscustomobject]@{ Key = "Q"; Group = "Help"; GroupEs = "Ayuda"; Label = "Quit"; LabelEs = "Salir"; Description = "Exit the toolkit."; DescriptionEs = "Salir del toolkit." }
     )
@@ -228,8 +260,8 @@ function Read-ToolkitActionChoice {
         }
 
         Write-ToolkitMenuLine ""
-        $leftActions = @($actions | Select-Object -First 10)
-        $rightActions = @($actions | Select-Object -Skip 10)
+        $leftActions = @($actions | Select-Object -First 12)
+        $rightActions = @($actions | Select-Object -Skip 12)
         function New-ToolkitMenuRows {
             param($Items)
             $rows = New-Object System.Collections.Generic.List[object]
@@ -371,6 +403,8 @@ function Show-Menu {
             "Back up a hosted profile" = "Crear backup de perfil"
             "Verify a backup folder" = "Verificar backup"
             "Restore backup / create lab copy" = "Restaurar / copia lab"
+            "Inspect native PZ auto backups" = "Inspeccionar backups auto PZ"
+            "Restore native PZ auto backup (WhatIf first)" = "Restaurar backup auto PZ"
             "Copy world/save to another profile (lab/fork)" = "Copiar mundo a otro perfil"
             "Copy players to another profile (lab/fork)" = "Copiar jugadores"
             "Export profile mod/map lists" = "Exportar perfil"
@@ -449,6 +483,35 @@ function Show-Menu {
                 $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la reparacion real de Workshop?" } else { "Run the real repair-workshop operation now?" }
                 if (Read-PZTYesNo -Prompt $prompt -Default $false) {
                     Invoke-ToolkitCommand -Name "repair-workshop" -Args @("-ConfirmRepair")
+                }
+            }
+            "Inspect native PZ auto backups" {
+                Write-ToolkitPrepTitle "Preparing - Inspect native PZ auto backups" "Preparando - Inspeccionar backups auto PZ"
+                $profile = Read-ToolkitProfile -Prompt $(if ((Get-PZTLanguage) -eq "es") { "Filtrar por perfil hosted, o cancela para ver todos" } else { "Filter by hosted profile, or cancel to show all" })
+                if ($profile) {
+                    Invoke-ToolkitCommand -Name "inspect-auto-backups" -Args @("-ProfileName", $profile, "-Details")
+                }
+                else {
+                    Invoke-ToolkitCommand -Name "inspect-auto-backups" -Args @("-Details")
+                }
+                $prompt = if ((Get-PZTLanguage) -eq "es") { "Continuar ahora con una restauracion simulada de uno de estos backups?" } else { "Continue now with a WhatIf restore from one of these backups?" }
+                if ($profile -and (Read-PZTYesNo -Prompt $prompt -Default $false)) {
+                    $zip = Read-ToolkitAutoBackupZip -ProfileName $profile
+                    if ($zip) {
+                        Invoke-ToolkitCommand -Name "restore-auto-backup" -Args @("-BackupZip", $zip, "-ProfileName", $profile, "-Overwrite", "-WhatIf")
+                    }
+                }
+            }
+            "Restore native PZ auto backup (WhatIf first)" {
+                Write-ToolkitPrepTitle "Preparing - Restore native PZ auto backup" "Preparando - Restaurar backup auto PZ"
+                $profile = Read-ToolkitProfile -Prompt $(if ((Get-PZTLanguage) -eq "es") { "Elige perfil hosted a restaurar in-place" } else { "Choose hosted profile to restore in place" })
+                if (-not $profile) { continue }
+                $zip = Read-ToolkitAutoBackupZip -ProfileName $profile
+                if (-not $zip) { continue }
+                Invoke-ToolkitCommand -Name "restore-auto-backup" -Args @("-BackupZip", $zip, "-ProfileName", $profile, "-Overwrite", "-WhatIf")
+                $prompt = if ((Get-PZTLanguage) -eq "es") { "Ejecutar ahora la restauracion real? No cierres la terminal durante el proceso." } else { "Run the real restore now? Do not close the terminal during the process." }
+                if (Read-PZTYesNo -Prompt $prompt -Default $false) {
+                    Invoke-ToolkitCommand -Name "restore-auto-backup" -Args @("-BackupZip", $zip, "-ProfileName", $profile, "-Overwrite", "-ConfirmRestore")
                 }
             }
             "Compare sandbox profiles" {

@@ -12,6 +12,7 @@ Use WhatIf/dry-run first for repair, reset, copy, restore, and cleanup actions.
   Inspect & Diagnose                 Backup & Recovery
   > Quick diagnosis                  Backup hosted profile
     Inspect hosted profile           Verify backup
+    Inspect PZ auto backups          Restore PZ auto backup
     Health check profile             Restore profile backup
     Find latest errors
     Inspect BLAM chunks              Compare & Transfer
@@ -29,6 +30,8 @@ Use WhatIf/dry-run first for repair, reset, copy, restore, and cleanup actions.
 - Running a quick read-only diagnosis before touching files.
 - Backing up a hosted profile before changing mods, sandbox settings, players, or world data.
 - Verifying toolkit-created backups before relying on them.
+- Inspecting native Project Zomboid startup/version/period backup ZIPs before relying on them.
+- Selectively restoring a native PZ auto-backup to the same hosted profile without extracting global ZIP folders.
 - Restoring a backup to the original hosted profile, or creating a lab/fork copy under a new profile name.
 - Inspecting hosted profile files, mods, maps, save size, player rows, and recent state.
 - Comparing active mods, Workshop IDs, map lists, and sandbox settings between profiles.
@@ -133,6 +136,25 @@ Backups are marked `INCOMPLETE` at the start and `COMPLETE` at the end. Verify a
 ```powershell
 .\pz-toolkit.ps1 verify-backup -BackupPath ".\backups\profile-MyHostedServer-20260101-120000"
 ```
+
+Inspect native Project Zomboid auto-backup ZIPs:
+
+```powershell
+.\pz-toolkit.ps1 inspect-auto-backups
+.\pz-toolkit.ps1 inspect-auto-backups -ProfileName "MyHostedServer" -Details
+.\tools\pz-inspect-auto-backups.ps1 -ProfileName "MyHostedServer" -Details -NoCache
+```
+
+Native auto-backup inspection caches parsed ZIP metadata under `cache/auto-backups/` and invalidates entries when a ZIP path, size, or timestamp changes. Use `-NoCache` when you want to force a fresh read of every ZIP.
+
+Restore a native PZ auto-backup selectively to the same hosted profile:
+
+```powershell
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -WhatIf
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -ConfirmRestore
+```
+
+This restore is intentionally in-place only. It restores the matching `Server/<profile>*`, `db/<profile>.db`, and `Saves/Multiplayer/<profile>/` entries from the ZIP. It does not extract global ZIP folders such as `Lua`, `mods`, unrelated `Server` entries, or unrelated `db` files. Do not close the terminal while a real restore is running. The real restore flow prints long-step warnings and runs a profile health-check when replacement finishes.
 
 Inspect a hosted profile:
 

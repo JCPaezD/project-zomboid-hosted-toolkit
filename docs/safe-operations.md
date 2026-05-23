@@ -82,6 +82,45 @@ Real direct-script restore/copy/reset operations require explicit confirmation f
 
 `restore-profile` refuses to restore backups whose `BACKUP_STATUS.txt` is not `COMPLETE`, unless you add `-AllowIncompleteBackup` for a deliberate manual rescue.
 
+## Native PZ Auto-Backups
+
+Project Zomboid can create native ZIP backups under:
+
+```text
+Zomboid\backups\startup\
+Zomboid\backups\version\
+Zomboid\backups\period\
+```
+
+Those ZIPs are broader than one save folder. They can include global folders such as `Server`, `db`, `Lua`, and `mods`, plus the active hosted save. In a local hosted/co-op setup with several profiles sharing the same `Zomboid` folder, extracting the whole ZIP can overwrite unrelated profiles.
+
+Use inspection first:
+
+```powershell
+.\pz-toolkit.ps1 inspect-auto-backups -ProfileName "MyHostedServer" -Details
+```
+
+Inspection caches parsed ZIP metadata under `cache/auto-backups/` so repeated restore previews do not need to re-read every large backup. Cache entries are invalidated when the ZIP path, size, or timestamp changes. Use the direct script option `-NoCache` if you need to force a fresh read.
+
+For rollback of one hosted profile, use selective restore:
+
+```powershell
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -WhatIf
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -ConfirmRestore
+```
+
+The selective auto-backup restore:
+
+- requires Project Zomboid to be closed;
+- requires the ZIP `readme.txt` `ServerName` to match the target profile;
+- restores only `Server/<profile>*`, `db/<profile>.db`, and `Saves/Multiplayer/<profile>/`;
+- creates a toolkit safety backup first;
+- does not restore global `Lua`, `mods`, unrelated `Server`, or unrelated `db` entries.
+
+Do not close the terminal while a real restore is running. Closing during the replacement step can leave a partial profile. The safety backup is there for recovery, but the operation should be allowed to finish.
+
+After a real native auto-backup restore, the toolkit runs `health-check` for the restored profile automatically. Treat an `OK` result as a consistency check, not as a guarantee that every modded gameplay system is healthy.
+
 ## Encoding Safety
 
 Some PZ Lua/config files may fail to load if they start with UTF-8 BOM:

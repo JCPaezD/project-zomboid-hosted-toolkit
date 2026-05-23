@@ -124,6 +124,7 @@ CRC mismatch save=1 load=2
 Set-TestText -Path (Join-Path $savesDir "${profile}_player\player.bin") -Content "fake player"
 New-Item -ItemType Directory -Path $dbDir -Force | Out-Null
 Set-TestText -Path (Join-Path $dbDir "$profile.db") -Content "fake db placeholder"
+Set-TestText -Path (Join-Path $dbDir "$otherProfile.db") -Content "existing other db"
 
 Set-TestText -Path (Join-Path $logsDir "2026-01-01_12-00_DebugLog-server.txt") -Content @"
 LOG  : Workshop: GetItemState()=Installed|NeedsUpdate ID=123
@@ -148,6 +149,84 @@ name=Example Mod
 id=ExampleMod
 "@
 
+$autoStage = Join-Path $tmp "auto-backup-stage"
+Set-TestText -Path (Join-Path $autoStage "readme.txt") -Content @"
+Backup time: 2026-01-01 at 11:30:00 CEST
+ServerName: TestProfile
+Current server version:42.18
+Current world version:245
+World version in this backup is:245
+"@
+foreach ($file in Get-ChildItem -LiteralPath $serverDir -File -Filter "$profile*") {
+    Set-TestText -Path (Join-Path $autoStage "Server\$($file.Name)") -Content (Get-Content -LiteralPath $file.FullName -Raw)
+}
+Set-TestText -Path (Join-Path $autoStage "db\$profile.db") -Content "auto backup db"
+Set-TestText -Path (Join-Path $autoStage "Saves\Multiplayer\$profile\map_t.bin") -Content "auto backup map"
+Set-TestText -Path (Join-Path $autoStage "Saves\Multiplayer\$profile\players.db") -Content "auto backup players placeholder"
+Set-TestText -Path (Join-Path $autoStage "Saves\Multiplayer\$profile\map\10\20.bin") -Content "active chunk"
+Set-TestText -Path (Join-Path $autoStage "Saves\Multiplayer\$profile\blam\10\20.bin") -Content "bad chunk"
+Set-TestText -Path (Join-Path $autoStage "Saves\Multiplayer\$profile\blam\10\20_error.txt") -Content @"
+java.lang.RuntimeException: SANITY CHECK FAIL! thread="LoadChunk"
+CRC mismatch save=1 load=2
+"@
+Set-TestText -Path (Join-Path $autoStage "Server\$otherProfile.ini") -Content "PublicName=Other Server"
+Set-TestText -Path (Join-Path $autoStage "db\$otherProfile.db") -Content "other db should not restore"
+Set-TestText -Path (Join-Path $autoStage "Lua\server.lua") -Content "global lua should not restore"
+Set-TestText -Path (Join-Path $autoStage "mods\localmod.txt") -Content "global mod should not restore"
+$autoZipDir = Join-Path $zRoot "backups\startup"
+New-Item -ItemType Directory -Path $autoZipDir -Force | Out-Null
+$autoZip = Join-Path $autoZipDir "backup_1.zip"
+if (Test-Path -LiteralPath $autoZip) { Remove-Item -LiteralPath $autoZip -Force }
+Compress-Archive -Path (Join-Path $autoStage "*") -DestinationPath $autoZip
+
+$spaceAutoStage = Join-Path $tmp "space-auto-backup-stage"
+Set-TestText -Path (Join-Path $spaceAutoStage "readme.txt") -Content @"
+Backup time: 2026-01-01 at 12:30:00 CEST
+ServerName: Profile With Spaces
+Current server version:42.18
+Current world version:245
+World version in this backup is:245
+"@
+Set-TestText -Path (Join-Path $spaceAutoStage "Server\$spaceProfile.ini") -Content (Get-Content -LiteralPath (Join-Path $serverDir "$spaceProfile.ini") -Raw)
+Set-TestText -Path (Join-Path $spaceAutoStage "db\$spaceProfile.db") -Content "space db"
+Set-TestText -Path (Join-Path $spaceAutoStage "Saves\Multiplayer\Profile_With_Spaces\map_t.bin") -Content "space map"
+$spaceAutoZip = Join-Path $autoZipDir "backup_2.zip"
+if (Test-Path -LiteralPath $spaceAutoZip) { Remove-Item -LiteralPath $spaceAutoZip -Force }
+Compress-Archive -Path (Join-Path $spaceAutoStage "*") -DestinationPath $spaceAutoZip
+
+$badPrefixStage = Join-Path $tmp "bad-prefix-auto-backup-stage"
+Set-TestText -Path (Join-Path $badPrefixStage "readme.txt") -Content @"
+Backup time: 2026-01-01 at 13:30:00 CEST
+ServerName: Foo
+Current server version:42.18
+Current world version:245
+World version in this backup is:245
+"@
+Set-TestText -Path (Join-Path $badPrefixStage "Server\FooBar.ini") -Content "PublicName=FooBar"
+Set-TestText -Path (Join-Path $badPrefixStage "db\Foo.db") -Content "foo db"
+Set-TestText -Path (Join-Path $badPrefixStage "Saves\Multiplayer\Foo\map_t.bin") -Content "foo map"
+$badPrefixZip = Join-Path $autoZipDir "backup_3.zip"
+if (Test-Path -LiteralPath $badPrefixZip) { Remove-Item -LiteralPath $badPrefixZip -Force }
+Compress-Archive -Path (Join-Path $badPrefixStage "*") -DestinationPath $badPrefixZip
+
+$partialServerStage = Join-Path $tmp "partial-server-auto-backup-stage"
+Set-TestText -Path (Join-Path $partialServerStage "readme.txt") -Content @"
+Backup time: 2026-01-01 at 14:30:00 CEST
+ServerName: PartialProfile
+Current server version:42.18
+Current world version:245
+World version in this backup is:245
+"@
+Set-TestText -Path (Join-Path $partialServerStage "Server\PartialProfile.ini") -Content "PublicName=PartialProfile"
+Set-TestText -Path (Join-Path $partialServerStage "db\PartialProfile.db") -Content "partial db"
+Set-TestText -Path (Join-Path $partialServerStage "Saves\Multiplayer\PartialProfile\map_t.bin") -Content "partial map"
+$partialServerZip = Join-Path $autoZipDir "backup_4.zip"
+if (Test-Path -LiteralPath $partialServerZip) { Remove-Item -LiteralPath $partialServerZip -Force }
+Compress-Archive -Path (Join-Path $partialServerStage "*") -DestinationPath $partialServerZip
+
+$badZip = Join-Path $autoZipDir "backup_5.zip"
+Set-TestText -Path $badZip -Content "this is not a zip file"
+
 $python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $python) { $python = Get-Command py -ErrorAction SilentlyContinue }
 if ($python) {
@@ -166,6 +245,9 @@ con.close()
     Set-TestText -Path $pyPath -Content $py
     & $python.Source $pyPath
     if ($LASTEXITCODE -ne 0) { throw "Failed to create fixture SQLite DB." }
+    Copy-Item -LiteralPath $playersDb -Destination (Join-Path $autoStage "Saves\Multiplayer\$profile\players.db") -Force
+    if (Test-Path -LiteralPath $autoZip) { Remove-Item -LiteralPath $autoZip -Force }
+    Compress-Archive -Path (Join-Path $autoStage "*") -DestinationPath $autoZip
 }
 
 Invoke-Checked -Name "PowerShell scripts parse" -Script {
@@ -296,6 +378,60 @@ Invoke-Checked -Name "quick diagnosis summarizes actionable warnings" -Script {
 Invoke-Checked -Name "quick diagnosis detects workshop update lock" -Script {
     & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
 } -Assert { param($text) $text -match '"Area":\s+"Workshop update lock"' -and $text -match '"WorkshopId":\s+"123"' -and $text -match '"StagedDownloadFolder":\s+false' }
+
+Invoke-Checked -Name "inspect native auto backups reads readme and profile counts" -Script {
+    $json = & (Join-Path $root "tools\pz-inspect-auto-backups.ps1") -ZomboidRoot $zRoot -ProfileName $profile -Json -NoCache
+    $parsed = $json | ConvertFrom-Json
+    "server=$($parsed[0].ServerName) type=$($parsed[0].Type) global=$($parsed[0].ContainsGlobalState) display=$($parsed[0].BackupDisplayTime)"
+} -Assert { param($text) $text -match "server=TestProfile" -and $text -match "type=startup" -and $text -match "global=True" -and $text -match "display=2026-01-01 11:30" }
+
+Invoke-Checked -Name "inspect native auto backups Spanish output has no mojibake" -Script {
+    $oldLang = $env:PZTK_LANGUAGE
+    $env:PZTK_LANGUAGE = "es"
+    try {
+        & (Join-Path $root "tools\pz-inspect-auto-backups.ps1") -ZomboidRoot $zRoot -ProfileName $profile -Limit 1 -NoCache 2>&1 | Out-String
+    }
+    finally {
+        $env:PZTK_LANGUAGE = $oldLang
+    }
+} -Assert { param($text) $s = ($text | Out-String); $s -match "TestProfile" -and $s -notmatch "\u00C3|\u00C2|\uFFFD" }
+
+Invoke-Checked -Name "inspect native auto backups supports normalized save folder names" -Script {
+    $json = & (Join-Path $root "tools\pz-inspect-auto-backups.ps1") -ZomboidRoot $zRoot -ProfileName $spaceProfile -Json -NoCache
+    $parsed = $json | ConvertFrom-Json
+    "save=$($parsed[0].ProfileEntries.SaveNameInZip) entries=$($parsed[0].ProfileEntries.SaveEntries)"
+} -Assert { param($text) $text -match "save=Profile_With_Spaces" -and $text -match "entries=1" }
+
+Invoke-Checked -Name "restore native auto backup what-if is selective" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-restore-auto-backup.ps1") -BackupZip $autoZip -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -Overwrite -WhatIf 2>&1 | Out-String
+} -Assert { param($text) $text -match "Simulated restore" -and $text -match "global Lua/mods" -and $text -match "toolkit safety backup" }
+
+Invoke-Checked -Name "native auto backup detects prefix-collision server files" -Script {
+    . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
+    $info = Get-PZTAutoBackupInfo -ZipPath $badPrefixZip
+    "serverEntries=$($info.ProfileEntries.ServerEntries) iniEntries=$($info.ProfileEntries.IniEntries) saveEntries=$($info.ProfileEntries.SaveEntries) dbEntries=$($info.ProfileEntries.DbEntries)"
+} -Assert { param($text) $text -match "serverEntries=0" -and $text -match "iniEntries=0" -and $text -match "saveEntries=1" -and $text -match "dbEntries=1" }
+
+Invoke-Checked -Name "native auto backup detects partial server file set" -Script {
+    . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
+    $info = Get-PZTAutoBackupInfo -ZipPath $partialServerZip
+    "ini=$($info.ProfileEntries.IniEntries) sandbox=$($info.ProfileEntries.SandboxEntries) serverEntries=$($info.ProfileEntries.ServerEntries)"
+} -Assert { param($text) $text -match "ini=1" -and $text -match "sandbox=0" -and $text -match "serverEntries=1" }
+
+Invoke-Checked -Name "inspect native auto backups tolerates corrupt zip" -Script {
+    $text = & (Join-Path $root "tools\pz-inspect-auto-backups.ps1") -ZomboidRoot $zRoot -AllProfiles -Limit 10 -NoCache 2>&1 | Out-String
+    $text
+} -Assert { param($text) $text -match "backup_5.zip" -and $text -notmatch "PropertyNotFoundStrict|terminating error|IncompleteHashLiteral" }
+
+Invoke-Checked -Name "restore native auto backup performs selective rollback" -Script {
+    Set-TestText -Path (Join-Path $savesDir "$profile\map_t.bin") -Content "changed map before restore"
+    & (Join-Path $root "tools\pz-restore-auto-backup.ps1") -BackupZip $autoZip -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -Overwrite -ConfirmRestore
+    $map = Get-Content -LiteralPath (Join-Path $savesDir "$profile\map_t.bin") -Raw
+    $otherExists = Test-Path -LiteralPath (Join-Path $dbDir "$otherProfile.db")
+    $globalLuaExists = Test-Path -LiteralPath (Join-Path $zRoot "Lua\server.lua")
+    "$map other=$otherExists lua=$globalLuaExists"
+} -Assert { param($text) $text -match "auto backup map" -and $text -match "other=True" -and $text -match "lua=False" }
 
 Set-TestText -Path (Join-Path $logsDir "2026-01-01_15-00_DebugLog-server.txt") -Content @"
 LOG  : ConnectToServerState: GetItemState()=None ID=3724831368

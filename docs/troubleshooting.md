@@ -106,6 +106,28 @@ Use:
 
 Do not delete or restore chunks directly in a valuable save. Back up first and test any repair idea in a copied profile.
 
+## Roll Back A Bad Session With Native PZ Backups
+
+If a session caused desync, bad mod state, corrupted save data, or an unwanted world/player rollback target, inspect native PZ auto-backups before deleting anything:
+
+```powershell
+.\pz-toolkit.ps1 inspect-auto-backups -ProfileName "MyHostedServer" -Details
+```
+
+If the backup time and `ServerName` are correct, preview a selective in-place restore:
+
+```powershell
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -WhatIf
+```
+
+Only run the real restore after reviewing the preview and closing PZ:
+
+```powershell
+.\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -ConfirmRestore
+```
+
+The toolkit intentionally avoids full ZIP extraction because native PZ ZIPs can include global `Server`, `db`, `Lua`, and `mods` folders. In local hosted/co-op environments, a full extraction can affect unrelated profiles.
+
 ## Delete Player Fails in the Host UI
 
 Observed pattern:

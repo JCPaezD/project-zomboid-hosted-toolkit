@@ -1,5 +1,7 @@
 Set-StrictMode -Version 2.0
 
+$script:PZTToolkitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
+
 function Write-PZTStep {
     param(
         [Parameter(Mandatory=$true)][string]$Message,
@@ -29,6 +31,7 @@ function Write-PZTTitle {
             "PZ Hosted Toolkit - Health Check" = "PZ Hosted Toolkit - Comprobar salud"
             "PZ Hosted Toolkit - Profile Health Check" = "PZ Hosted Toolkit - Comprobar salud de perfil"
             "PZ Hosted Toolkit - Inspect Blam" = "PZ Hosted Toolkit - Inspeccionar blam"
+            "PZ Hosted Toolkit - Inspect Auto Backups" = "PZ Hosted Toolkit - Inspeccionar backups auto"
             "PZ Hosted Toolkit - Inspect Problem Chunks" = "PZ Hosted Toolkit - Inspeccionar chunks problematicos"
             "PZ Hosted Toolkit - Inspect Profile" = "PZ Hosted Toolkit - Inspeccionar perfil"
             "PZ Hosted Toolkit - Quick Diagnosis" = "PZ Hosted Toolkit - Diagnostico rapido"
@@ -36,6 +39,7 @@ function Write-PZTTitle {
             "PZ Hosted Toolkit - Reset Hosted Player" = "PZ Hosted Toolkit - Resetear jugador"
             "PZ Hosted Toolkit - Reset Hosted World" = "PZ Hosted Toolkit - Resetear mundo"
             "PZ Hosted Toolkit - Restore Profile" = "PZ Hosted Toolkit - Restaurar perfil"
+            "PZ Hosted Toolkit - Restore Auto Backup" = "PZ Hosted Toolkit - Restaurar backup auto"
             "PZ Hosted Toolkit - Verify Backup" = "PZ Hosted Toolkit - Verificar backup"
         }
         if ($titleMap.ContainsKey($Title)) { $Title = $titleMap[$Title] }
@@ -56,6 +60,31 @@ function Write-PZTTitle {
 function Get-PZTLanguage {
     if ($env:PZTK_LANGUAGE) { return $env:PZTK_LANGUAGE.ToLowerInvariant() }
     return "en"
+}
+
+function Get-PZTToolkitRoot {
+    return $script:PZTToolkitRoot
+}
+
+function Write-PZTActionLog {
+    param(
+        [Parameter(Mandatory=$true)][string]$Action,
+        [string]$Status = "Info",
+        [hashtable]$Data = @{}
+    )
+
+    $logDir = Join-Path (Get-PZTToolkitRoot) "logs"
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    $entry = [ordered]@{
+        Timestamp = (Get-Date).ToString("o")
+        Action = $Action
+        Status = $Status
+        User = $env:USERNAME
+        Machine = $env:COMPUTERNAME
+        Data = $Data
+    }
+    $json = $entry | ConvertTo-Json -Depth 12 -Compress
+    Add-Content -LiteralPath (Join-Path $logDir "toolkit-actions.jsonl") -Value $json -Encoding UTF8
 }
 
 function Get-PZTText {
@@ -618,6 +647,229 @@ function Get-PZTBackupDirectories {
     return @(Get-ChildItem -LiteralPath $BackupRoot -Directory -Force |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First $Limit)
+}
+
+function Get-PZTAutoBackupReadme {
+    param([Parameter(Mandatory=$true)][string]$Text)
+
+    $result = [ordered]@{
+        BackupTime = $null
+        ServerName = $null
+        CurrentServerVersion = $null
+        CurrentWorldVersion = $null
+        BackupWorldVersion = $null
+    }
+
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^Backup time:\s*(.+)$') {
+            $raw = $matches[1].Trim()
+            $result.BackupTime = $raw
+        }
+        elseif ($line -match '^ServerName:\s*(.+)$') {
+            $result.ServerName = $matches[1].Trim()
+        }
+        elseif ($line -match '^Current server version:\s*(.+)$') {
+            $result.CurrentServerVersion = $matches[1].Trim()
+        }
+        elseif ($line -match '^Current world version:\s*(.+)$') {
+            $result.CurrentWorldVersion = $matches[1].Trim()
+        }
+        elseif ($line -match '^World version in this backup is:\s*(.+)$') {
+            $result.BackupWorldVersion = $matches[1].Trim()
+        }
+    }
+
+    [pscustomobject]$result
+}
+
+function Format-PZTAutoBackupTime {
+    param(
+        [AllowNull()]$BackupInfo,
+        [string]$Format = "yyyy-MM-dd HH:mm"
+    )
+
+    $readme = $null
+    if ($BackupInfo -and $BackupInfo.PSObject.Properties.Match("Readme").Count -gt 0) {
+        $readme = $BackupInfo.Readme
+    }
+    if ($readme -and $readme.PSObject.Properties.Match("BackupTime").Count -gt 0 -and $readme.BackupTime) {
+        $raw = [string]$readme.BackupTime
+        $match = [regex]::Match($raw, '(\d{4}-\d{2}-\d{2})\s+at\s+(\d{2}:\d{2})(?::\d{2})?')
+        if ($match.Success) {
+            return "$($match.Groups[1].Value) $($match.Groups[2].Value)"
+        }
+        return $raw
+    }
+
+    if ($BackupInfo -and $BackupInfo.PSObject.Properties.Match("LastWriteTime").Count -gt 0 -and $BackupInfo.LastWriteTime) {
+        try {
+            return ([datetime]$BackupInfo.LastWriteTime).ToString($Format)
+        }
+        catch {
+            return [string]$BackupInfo.LastWriteTime
+        }
+    }
+
+    return ""
+}
+
+function Get-PZTAutoBackupInfo {
+    param(
+        [Parameter(Mandatory=$true)][string]$ZipPath,
+        [switch]$NoCache
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $resolved = (Resolve-Path -LiteralPath $ZipPath).Path
+    $file = Get-Item -LiteralPath $resolved
+    $type = Split-Path -Leaf (Split-Path -Parent $resolved)
+    $cacheDir = Join-Path (Get-PZTToolkitRoot) "cache\auto-backups"
+    $cacheKey = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($resolved)).TrimEnd("=").Replace("+","-").Replace("/","_")
+    $cachePath = Join-Path $cacheDir "$cacheKey.json"
+    if (-not $NoCache -and (Test-Path -LiteralPath $cachePath)) {
+        try {
+            $cached = Get-Content -LiteralPath $cachePath -Raw | ConvertFrom-Json
+            if ($cached.Cache.SchemaVersion -eq 2 -and $cached.Cache.Path -eq $resolved -and [int64]$cached.Cache.Length -eq [int64]$file.Length -and $cached.Cache.LastWriteTimeUtc -eq $file.LastWriteTimeUtc.ToString("o")) {
+                return $cached.Info
+            }
+        }
+        catch { }
+    }
+
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($resolved)
+    try {
+        $readmeEntry = $zip.GetEntry("readme.txt")
+        $readmeText = $null
+        if ($readmeEntry) {
+            $reader = [System.IO.StreamReader]::new($readmeEntry.Open())
+            try { $readmeText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        }
+        $readme = if ($readmeText) { Get-PZTAutoBackupReadme -Text $readmeText } else { $null }
+        $serverName = if ($readme) { $readme.ServerName } else { $null }
+        $entries = @($zip.Entries | ForEach-Object { $_.FullName -replace '\\','/' })
+        $serverEntries = @($entries | Where-Object { $_ -like "Server/*" })
+        $dbEntries = @($entries | Where-Object { $_ -like "db/*" })
+        $saveEntries = @($entries | Where-Object { $_ -like "Saves/Multiplayer/*" })
+
+        $profileInfo = $null
+        if ($serverName) {
+            $normalizedSaveName = Convert-PZTProfileNameToSaveName -ProfileName $serverName
+            $saveNameInZip = $null
+            if (@($entries | Where-Object { $_.StartsWith("Saves/Multiplayer/$serverName/", [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
+                $saveNameInZip = $serverName
+            }
+            elseif (@($entries | Where-Object { $_.StartsWith("Saves/Multiplayer/$normalizedSaveName/", [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
+                $saveNameInZip = $normalizedSaveName
+            }
+            $serverFileNames = @(
+                "Server/$serverName.ini",
+                "Server/${serverName}_SandboxVars.lua",
+                "Server/${serverName}_spawnpoints.lua",
+                "Server/${serverName}_spawnregions.lua"
+            )
+            $profileInfo = [pscustomobject]@{
+                SaveNameInZip = $saveNameInZip
+                SaveEntries = if ($saveNameInZip) { @($entries | Where-Object { $_.StartsWith("Saves/Multiplayer/$saveNameInZip/", [System.StringComparison]::OrdinalIgnoreCase) }).Count } else { 0 }
+                PlayerEntries = if ($saveNameInZip) { @($entries | Where-Object { $_.StartsWith("Saves/Multiplayer/${saveNameInZip}_player/", [System.StringComparison]::OrdinalIgnoreCase) }).Count } else { 0 }
+                ServerEntries = @($entries | Where-Object { $serverFileNames -icontains $_ }).Count
+                IniEntries = @($entries | Where-Object { $_ -ieq "Server/$serverName.ini" }).Count
+                SandboxEntries = @($entries | Where-Object { $_ -ieq "Server/${serverName}_SandboxVars.lua" }).Count
+                DbEntries = @($entries | Where-Object { $_ -ieq "db/$serverName.db" }).Count
+            }
+        }
+
+        $info = [pscustomobject]@{
+            Path = $resolved
+            Name = $file.Name
+            Type = $type
+            SizeMB = [math]::Round($file.Length / 1MB, 2)
+            LastWriteTime = $file.LastWriteTime
+            BackupDisplayTime = $null
+            HasReadme = [bool]$readmeEntry
+            Readme = $readme
+            ServerName = $serverName
+            EntryCounts = [pscustomobject]@{
+                Total = $entries.Count
+                Server = $serverEntries.Count
+                Db = $dbEntries.Count
+                Saves = $saveEntries.Count
+                Lua = @($entries | Where-Object { $_ -like "Lua/*" }).Count
+                Mods = @($entries | Where-Object { $_ -like "mods/*" }).Count
+            }
+            ProfileEntries = $profileInfo
+            ContainsGlobalState = ($serverEntries.Count -gt 0 -or $dbEntries.Count -gt 0 -or @($entries | Where-Object { $_ -like "Lua/*" -or $_ -like "mods/*" }).Count -gt 0)
+        }
+        $info.BackupDisplayTime = Format-PZTAutoBackupTime -BackupInfo $info
+        if (-not $NoCache) {
+            New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+            $payload = [pscustomobject]@{
+                Cache = [pscustomobject]@{
+                    SchemaVersion = 2
+                    Path = $resolved
+                    Length = $file.Length
+                    LastWriteTimeUtc = $file.LastWriteTimeUtc.ToString("o")
+                    CachedAt = (Get-Date).ToString("o")
+                }
+                Info = $info
+            }
+            Set-PZTTextNoBom -Path $cachePath -Content ($payload | ConvertTo-Json -Depth 16)
+        }
+        return $info
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
+function Get-PZTAutoBackups {
+    param(
+        [Parameter(Mandatory=$true)][string]$ZomboidRoot,
+        [string]$Type,
+        [int]$Limit = 50,
+        [string]$ProgressScope,
+        [switch]$NoCache
+    )
+
+    $backupRoot = Join-Path $ZomboidRoot "backups"
+    $types = if ($Type) { @($Type) } else { @("startup", "version", "period") }
+    $items = New-Object System.Collections.Generic.List[object]
+    $zipFiles = New-Object System.Collections.Generic.List[object]
+    foreach ($backupType in $types) {
+        $dir = Join-Path $backupRoot $backupType
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        Get-ChildItem -LiteralPath $dir -File -Filter "*.zip" -Force |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First $Limit |
+            ForEach-Object { $zipFiles.Add([pscustomobject]@{ Type = $backupType; File = $_ }) | Out-Null }
+    }
+    if ($ProgressScope) { Write-PZTStep (Get-PZTText "ZIP files found before analysis: $($zipFiles.Count)" "ZIPs encontrados antes de analizar: $($zipFiles.Count)") $ProgressScope }
+    $n = 0
+    foreach ($zipItem in $zipFiles) {
+        $n++
+        $zipFile = $zipItem.File
+        if ($ProgressScope) { Write-PZTStep (Get-PZTText "Analyzing backup $n/$($zipFiles.Count): $($zipItem.Type)\$($zipFile.Name)" "Analizando backup $n/$($zipFiles.Count): $($zipItem.Type)\$($zipFile.Name)") $ProgressScope }
+        try {
+            $items.Add((Get-PZTAutoBackupInfo -ZipPath $zipFile.FullName -NoCache:$NoCache)) | Out-Null
+        }
+        catch {
+            $items.Add([pscustomobject]@{
+                Path = $zipFile.FullName
+                Name = $zipFile.Name
+                Type = $zipItem.Type
+                SizeMB = [math]::Round($zipFile.Length / 1MB, 2)
+                LastWriteTime = $zipFile.LastWriteTime
+                BackupDisplayTime = Format-PZTAutoBackupTime -BackupInfo ([pscustomobject]@{ LastWriteTime = $zipFile.LastWriteTime })
+                HasReadme = $false
+                Readme = $null
+                ServerName = $null
+                EntryCounts = $null
+                ProfileEntries = $null
+                ContainsGlobalState = $false
+                Error = $_.Exception.Message
+            }) | Out-Null
+        }
+    }
+    return @($items.ToArray() | Sort-Object LastWriteTime -Descending)
 }
 
 function Test-PZTBackupComplete {
