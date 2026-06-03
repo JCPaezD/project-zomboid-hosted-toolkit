@@ -128,6 +128,37 @@ Only run the real restore after reviewing the preview and closing PZ:
 
 The toolkit intentionally avoids full ZIP extraction because native PZ ZIPs can include global `Server`, `db`, `Lua`, and `mods` folders. In local hosted/co-op environments, a full extraction can affect unrelated profiles.
 
+Native PZ auto-backups restore server-side profile/save state, not the host's local hosted-client cache folder:
+
+```text
+Saves\Multiplayer\<profile>_player
+```
+
+If the restore passes health-check but hosting later hangs while loading or downloading map chunks, look for signals such as:
+
+```text
+WorldStreamer
+requestLargeAreaZip
+Received <n>/<total> chunks
+map download
+CRC mismatch
+SANITY CHECK FAIL
+```
+
+Then preview the client-cache reset:
+
+```powershell
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -WhatIf
+```
+
+Only run the real reset if the profile and folder are correct:
+
+```powershell
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -ConfirmReset
+```
+
+This moves `<profile>_player` to a toolkit backup. It does not touch the server world or `players.db`, but it may reset local cache/map state for the host.
+
 ## Delete Player Fails in the Host UI
 
 Observed pattern:

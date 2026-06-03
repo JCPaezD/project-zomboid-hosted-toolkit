@@ -114,6 +114,7 @@ mod = ExampleClientMod
 
 New-Item -ItemType Directory -Path (Join-Path $savesDir $profile) -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $savesDir "${profile}_player") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $savesDir "Profile_With_Spaces_player") -Force | Out-Null
 Set-TestText -Path (Join-Path $savesDir "$profile\map_t.bin") -Content "fake map"
 Set-TestText -Path (Join-Path $savesDir "$profile\map\10\20.bin") -Content "active chunk"
 Set-TestText -Path (Join-Path $savesDir "$profile\blam\10\20.bin") -Content "bad chunk"
@@ -122,6 +123,7 @@ java.lang.RuntimeException: SANITY CHECK FAIL! thread="LoadChunk"
 CRC mismatch save=1 load=2
 "@
 Set-TestText -Path (Join-Path $savesDir "${profile}_player\player.bin") -Content "fake player"
+Set-TestText -Path (Join-Path $savesDir "Profile_With_Spaces_player\player.bin") -Content "space player"
 New-Item -ItemType Directory -Path $dbDir -Force | Out-Null
 Set-TestText -Path (Join-Path $dbDir "$profile.db") -Content "fake db placeholder"
 Set-TestText -Path (Join-Path $dbDir "$otherProfile.db") -Content "existing other db"
@@ -373,11 +375,26 @@ Invoke-Checked -Name "profile health-check supports names with spaces" -Script {
 
 Invoke-Checked -Name "quick diagnosis summarizes actionable warnings" -Script {
     & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
-} -Assert { param($text) $s = ($text | Out-String); $s.Contains('"Overall":  "Warning"') -and $s.Contains('"Client global mods"') -and $s.Contains('"Problem chunks"') }
+} -Assert { param($text) $s = ($text | Out-String); $s.Contains('"Overall":  "Warning"') -and $s.Contains('"Client global mods"') -and $s.Contains('"Problem chunks"') -and $s.Contains('"Hosted client cache"') }
 
 Invoke-Checked -Name "quick diagnosis detects workshop update lock" -Script {
     & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $profile -ZomboidRoot $zRoot -Json
 } -Assert { param($text) $text -match '"Area":\s+"Workshop update lock"' -and $text -match '"WorkshopId":\s+"123"' -and $text -match '"StagedDownloadFolder":\s+false' }
+
+Invoke-Checked -Name "quick diagnosis scopes blam to exact save folder" -Script {
+    $base = "PrefixProfile"
+    $copy = "PrefixProfileCopy"
+    Set-TestText -Path (Join-Path $serverDir "$base.ini") -Content "PublicName=$base`nMods=`nWorkshopItems=`nMap=Muldraugh, KY"
+    Set-TestText -Path (Join-Path $serverDir "${base}_SandboxVars.lua") -Content "SandboxVars = {}"
+    Set-TestText -Path (Join-Path $serverDir "${base}_spawnregions.lua") -Content "function SpawnRegions() return {} end"
+    Set-TestText -Path (Join-Path $serverDir "$copy.ini") -Content "PublicName=$copy`nMods=`nWorkshopItems=`nMap=Muldraugh, KY"
+    Set-TestText -Path (Join-Path $serverDir "${copy}_SandboxVars.lua") -Content "SandboxVars = {}"
+    Set-TestText -Path (Join-Path $serverDir "${copy}_spawnregions.lua") -Content "function SpawnRegions() return {} end"
+    New-Item -ItemType Directory -Path (Join-Path $savesDir $base) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $savesDir "${base}_player") -Force | Out-Null
+    Set-TestText -Path (Join-Path $savesDir "$copy\blam\99\88_error.txt") -Content "CRC mismatch in copy only"
+    & (Join-Path $root "tools\pz-quick-diagnosis.ps1") -ProfileName $base -ZomboidRoot $zRoot -Json
+} -Assert { param($text) $text -match '"MapChunkDownloadSignal":\s+false' -and $text -notmatch '"Area":\s+"Hosted client cache"' -and $text -match '"RecentBlamErrors":\s+\[' }
 
 Invoke-Checked -Name "inspect native auto backups reads readme and profile counts" -Script {
     $json = & (Join-Path $root "tools\pz-inspect-auto-backups.ps1") -ZomboidRoot $zRoot -ProfileName $profile -Json -NoCache
@@ -405,7 +422,7 @@ Invoke-Checked -Name "inspect native auto backups supports normalized save folde
 Invoke-Checked -Name "restore native auto backup what-if is selective" -Script {
     $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
     & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-restore-auto-backup.ps1") -BackupZip $autoZip -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -Overwrite -WhatIf 2>&1 | Out-String
-} -Assert { param($text) $text -match "Simulated restore" -and $text -match "global Lua/mods" -and $text -match "toolkit safety backup" }
+} -Assert { param($text) $text -match "Simulated restore" -and $text -match "global Lua/mods" -and $text -match "toolkit safety backup" -and $text -match "_player" }
 
 Invoke-Checked -Name "native auto backup detects prefix-collision server files" -Script {
     . (Join-Path $root "tools\lib\PZToolkit.Common.ps1")
@@ -430,8 +447,9 @@ Invoke-Checked -Name "restore native auto backup performs selective rollback" -S
     $map = Get-Content -LiteralPath (Join-Path $savesDir "$profile\map_t.bin") -Raw
     $otherExists = Test-Path -LiteralPath (Join-Path $dbDir "$otherProfile.db")
     $globalLuaExists = Test-Path -LiteralPath (Join-Path $zRoot "Lua\server.lua")
-    "$map other=$otherExists lua=$globalLuaExists"
-} -Assert { param($text) $text -match "auto backup map" -and $text -match "other=True" -and $text -match "lua=False" }
+    $playerCacheExists = Test-Path -LiteralPath (Join-Path $savesDir "${profile}_player")
+    "$map other=$otherExists lua=$globalLuaExists playerCache=$playerCacheExists"
+} -Assert { param($text) $text -match "auto backup map" -and $text -match "other=True" -and $text -match "lua=False" -and $text -match "playerCache=True" }
 
 Set-TestText -Path (Join-Path $logsDir "2026-01-01_15-00_DebugLog-server.txt") -Content @"
 LOG  : ConnectToServerState: GetItemState()=None ID=3724831368
@@ -569,6 +587,33 @@ Invoke-Checked -Name "reset hosted world what-if keeps save" -Script {
     & (Join-Path $root "tools\pz-reset-hosted-world.ps1") -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
     Test-Path -LiteralPath (Join-Path $savesDir $profile)
 } -Assert { param($text) $text -match "True" }
+
+Invoke-Checked -Name "reset hosted client cache what-if keeps folder" -Script {
+    & (Join-Path $root "tools\pz-reset-hosted-client-cache.ps1") -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
+    Test-Path -LiteralPath (Join-Path $savesDir "${profile}_player")
+} -Assert { param($text) $text -match "True" }
+
+Invoke-Checked -Name "reset hosted client cache requires confirmation" -Script {
+    $ps = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\pz-reset-hosted-client-cache.ps1") -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot 2>&1
+} -Assert { param($text) $text -match "without -ConfirmReset" -and (Test-Path -LiteralPath (Join-Path $savesDir "${profile}_player")) }
+
+Invoke-Checked -Name "reset hosted client cache handles normalized save names" -Script {
+    & (Join-Path $root "tools\pz-reset-hosted-client-cache.ps1") -ProfileName $spaceProfile -ZomboidRoot $zRoot -BackupRoot $backupRoot -WhatIf
+    Test-Path -LiteralPath (Join-Path $savesDir "Profile_With_Spaces_player")
+} -Assert { param($text) $text -match "True" }
+
+Invoke-Checked -Name "reset hosted client cache moves only player folder" -Script {
+    & (Join-Path $root "tools\pz-reset-hosted-client-cache.ps1") -ProfileName $profile -ZomboidRoot $zRoot -BackupRoot $backupRoot -ConfirmReset
+    $cacheExists = Test-Path -LiteralPath (Join-Path $savesDir "${profile}_player")
+    $saveExists = Test-Path -LiteralPath (Join-Path $savesDir $profile)
+    $backup = Get-ChildItem -LiteralPath $backupRoot -Directory -Filter "$profile-client-cache-before-reset-*" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    $backupCacheExists = $false
+    if ($backup) { $backupCacheExists = Test-Path -LiteralPath (Join-Path $backup.FullName "Saves\Multiplayer\${profile}_player") }
+    "cache=$cacheExists save=$saveExists backupCache=$backupCacheExists"
+} -Assert { param($text) $text -match "cache=False" -and $text -match "save=True" -and $text -match "backupCache=True" }
 
 Write-Host ""
 Write-Host "Smoke tests: $pass passed, $fail failed"

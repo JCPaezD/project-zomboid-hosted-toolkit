@@ -115,11 +115,20 @@ The selective auto-backup restore:
 - requires the ZIP `readme.txt` `ServerName` to match the target profile;
 - restores only `Server/<profile>*`, `db/<profile>.db`, and `Saves/Multiplayer/<profile>/`;
 - creates a toolkit safety backup first;
-- does not restore global `Lua`, `mods`, unrelated `Server`, or unrelated `db` entries.
+- does not restore global `Lua`, `mods`, unrelated `Server`, unrelated `db` entries, or local hosted-client cache folders such as `Saves/Multiplayer/<profile>_player`.
 
 Do not close the terminal while a real restore is running. Closing during the replacement step can leave a partial profile. The safety backup is there for recovery, but the operation should be allowed to finish.
 
 After a real native auto-backup restore, the toolkit runs `health-check` for the restored profile automatically. Treat an `OK` result as a consistency check, not as a guarantee that every modded gameplay system is healthy.
+
+Native PZ auto-backup ZIPs do not normally include the host's local `<profile>_player` folder. If the server-side restore is healthy but the host later hangs while downloading or loading map chunks, inspect logs and then reset the hosted client cache explicitly:
+
+```powershell
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -WhatIf
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -ConfirmReset
+```
+
+This moves only `Saves\Multiplayer\<profile>_player` into a toolkit backup. It does not reset the server world or `Saves\Multiplayer\<profile>\players.db`, but it can affect client-local map/cache state for the host.
 
 ## Encoding Safety
 

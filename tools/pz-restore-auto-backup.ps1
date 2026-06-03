@@ -156,7 +156,7 @@ Write-Host ("  " + (Get-PZTText "Target:    " "Destino:   ") + $ProfileName)
 if ($sourceSaveName -ne $ProfileName) { Write-Host "  ZIP save:  $sourceSaveName" }
 if ($targetSaveName -ne $ProfileName) { Write-Host "  Save dir:  $targetSaveName" }
 Write-Host ("  " + (Get-PZTText "Scope:     " "Alcance:   ") + (Get-PZTText "Server profile files, profile db, and hosted save folder only" "Archivos del perfil, db del perfil y carpeta save hosted"))
-Write-Host ("  " + (Get-PZTText "Excluded:  " "Excluido:  ") + (Get-PZTText "global Lua/mods and unrelated Server/db entries" "Lua/mods globales y entradas Server/db no relacionadas"))
+Write-Host ("  " + (Get-PZTText "Excluded:  " "Excluido:  ") + (Get-PZTText "global Lua/mods, unrelated Server/db entries, and hosted client cache <profile>_player" "Lua/mods globales, entradas Server/db no relacionadas y cache cliente hosted <perfil>_player"))
 
 $missing = New-Object System.Collections.Generic.List[string]
 if (-not $info.ProfileEntries -or $info.ProfileEntries.SaveEntries -eq 0) { $missing.Add("Saves/Multiplayer/$ProfileName/ or normalized save folder") | Out-Null }
@@ -188,6 +188,8 @@ if ($WhatIf) {
     Write-Host "    - $targetSaveDir"
     Write-Host "    - $targetDb"
     foreach ($file in $targetServerFiles) { Write-Host "    - $file" }
+    Write-Host ("  " + (Get-PZTText "Would not touch hosted client cache:" "No tocaria la cache cliente hosted:"))
+    Write-Host "    - $(Join-Path $paths.SavesDir "${targetSaveName}_player")"
     Write-Host ("  " + (Get-PZTText "Action log is not written for a simulation." "La simulacion no escribe en el log de acciones."))
     exit 0
 }
@@ -277,3 +279,6 @@ if ($LASTEXITCODE -ne 0) { throw "Health-check failed after restore. Review the 
 Write-PZTStep (Get-PZTText `
     "Restore flow complete. If health-check status is OK, launch PZ and test the save normally." `
     "Flujo de restauracion completado. Si el health-check esta OK, abre PZ y prueba la partida normalmente.") "pz-restore-auto-backup"
+Write-PZTStep (Get-PZTText `
+    "Native PZ auto-backups do not include hosted client cache <profile>_player. If the restored save later hangs while downloading/loading map chunks, run reset-client-cache -WhatIf for this profile." `
+    "Los backups automaticos nativos de PZ no incluyen la cache cliente hosted <perfil>_player. Si el save restaurado se bloquea descargando/cargando chunks de mapa, ejecuta reset-client-cache -WhatIf para este perfil.") "pz-restore-auto-backup"

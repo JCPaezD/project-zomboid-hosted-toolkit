@@ -36,6 +36,7 @@ function Write-PZTTitle {
             "PZ Hosted Toolkit - Inspect Profile" = "PZ Hosted Toolkit - Inspeccionar perfil"
             "PZ Hosted Toolkit - Quick Diagnosis" = "PZ Hosted Toolkit - Diagnostico rapido"
             "PZ Hosted Toolkit - Repair Workshop Redownload" = "PZ Hosted Toolkit - Reparar redownload Workshop"
+            "PZ Hosted Toolkit - Reset Hosted Client Cache" = "PZ Hosted Toolkit - Resetear cache cliente hosted"
             "PZ Hosted Toolkit - Reset Hosted Player" = "PZ Hosted Toolkit - Resetear jugador"
             "PZ Hosted Toolkit - Reset Hosted World" = "PZ Hosted Toolkit - Resetear mundo"
             "PZ Hosted Toolkit - Restore Profile" = "PZ Hosted Toolkit - Restaurar perfil"
@@ -891,6 +892,7 @@ function Get-PZTProfileHealth {
     $spawnregions = Join-Path $Paths.ServerDir "${ProfileName}_spawnregions.lua"
     $saveName = Get-PZTProfileSaveName -SavesDir $Paths.SavesDir -ProfileName $ProfileName
     $saveDir = Join-Path $Paths.SavesDir $saveName
+    $blamDir = Join-Path $saveDir "blam"
     $profileDb = Join-Path $Paths.DbDir "$ProfileName.db"
     $playersDb = Join-Path $saveDir "players.db"
 
@@ -923,6 +925,12 @@ function Get-PZTProfileHealth {
     if ($mapsCount -eq 0) { Add-PZTHealthIssue -Severity "Warning" -Code "NoMapEntries" -Message (Get-PZTText "Map list is empty." "La lista Map esta vacia.") }
     if (-not (Test-Path -LiteralPath $saveDir)) { Add-PZTHealthIssue -Severity "Info" -Code "NoSaveYet" -Message (Get-PZTText "Save folder was not found. This is normal for a profile that has not launched a world yet." "No se encontro carpeta de save. Es normal en un perfil que aun no ha lanzado un mundo.") }
     if ((Test-Path -LiteralPath $saveDir) -and -not (Test-Path -LiteralPath $playersDb)) { Add-PZTHealthIssue -Severity "Warning" -Code "MissingPlayersDb" -Message (Get-PZTText "Save folder exists but players.db is missing." "La carpeta de save existe, pero falta players.db.") }
+    if (Test-Path -LiteralPath $blamDir) {
+        $blamErrors = @(Get-ChildItem -LiteralPath $blamDir -Recurse -File -Filter "*_error.txt" -ErrorAction SilentlyContinue)
+        if ($blamErrors.Count -gt 0) {
+            Add-PZTHealthIssue -Severity "Warning" -Code "ProblemChunksBlam" -Message ((Get-PZTText "{0} blam/problem-chunk error file(s) found. This may be historical; run inspect-blam and compare timestamps before repairing anything." "{0} archivo(s) de error blam/chunk problematico encontrados. Puede ser historico; ejecuta inspect-blam y compara fechas antes de reparar nada.") -f $blamErrors.Count)
+        }
+    }
 
     $status = "OK"
     if (@($issues | Where-Object { $_.Severity -eq "Warning" }).Count -gt 0) { $status = "Warning" }
@@ -943,6 +951,7 @@ function Get-PZTProfileHealth {
             Sandbox = $sandbox
             Spawnregions = $spawnregions
             Save = $saveDir
+            Blam = $blamDir
             ProfileDb = $profileDb
             PlayersDb = $playersDb
         }
@@ -951,6 +960,7 @@ function Get-PZTProfileHealth {
             Sandbox = (Test-Path -LiteralPath $sandbox)
             Spawnregions = (Test-Path -LiteralPath $spawnregions)
             Save = (Test-Path -LiteralPath $saveDir)
+            Blam = (Test-Path -LiteralPath $blamDir)
             ProfileDb = (Test-Path -LiteralPath $profileDb)
             PlayersDb = (Test-Path -LiteralPath $playersDb)
         }

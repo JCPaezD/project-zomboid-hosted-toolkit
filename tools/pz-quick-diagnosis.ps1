@@ -34,7 +34,7 @@ if (Test-Path -LiteralPath $paths.LogsDir) {
         Select-Object -First 1
     if ($latestDebug) {
         $latestDebugText = Get-Content -LiteralPath $latestDebug.FullName -Raw
-        $knownPatterns = "ERROR|Exception|UI_ServerStatus_Terminated|Installed\|NeedsUpdate|Installed status but timeUpdated|DownloadPending|onItemNotDownloaded|onItemNotSubscribed|SubscribePending\s+->\s+Fail|GetItemState\(\)=None|CRC mismatch|SANITY CHECK FAIL|Error loading chunk|OutOfMemoryError|ReceiveModData|ObjectModDataPacket|MalformedInputException|FileSystemException|being used by another process|está siendo utilizado por otro proceso|El proceso no tiene acceso al archivo"
+        $knownPatterns = "ERROR|Exception|UI_ServerStatus_Terminated|Installed\|NeedsUpdate|Installed status but timeUpdated|DownloadPending|onItemNotDownloaded|onItemNotSubscribed|SubscribePending\s+->\s+Fail|GetItemState\(\)=None|CRC mismatch|SANITY CHECK FAIL|Error loading chunk|WorldStreamer|requestLargeAreaZip|Received\s+\d+\s*/\s*\d+\s+chunks|map download|OutOfMemoryError|ReceiveModData|ObjectModDataPacket|MalformedInputException|FileSystemException|being used by another process|está siendo utilizado por otro proceso|El proceso no tiene acceso al archivo"
         $logItems = @(Select-String -LiteralPath $latestDebug.FullName -Pattern $knownPatterns -ErrorAction SilentlyContinue | Select-Object -Last 8)
     }
 }
@@ -46,8 +46,26 @@ foreach ($profile in $profilesToCheck) {
 
 $blamFiles = @()
 if (Test-Path -LiteralPath $paths.SavesDir) {
+    $saveNamesToCheck = @($profilesToCheck | ForEach-Object {
+        if ($_) { Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $_ }
+    })
     $blamFiles = @(Get-ChildItem -LiteralPath $paths.SavesDir -Filter "*_error.txt" -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -match "\\blam\\" } |
+        Where-Object {
+            if ($saveNamesToCheck.Count -eq 0) { $true }
+            else {
+                $insideCheckedSave = $false
+                foreach ($saveName in $saveNamesToCheck) {
+                    $saveRoot = (Join-Path $paths.SavesDir $saveName).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+                    $saveRootWithSeparator = $saveRoot + [System.IO.Path]::DirectorySeparatorChar
+                    if ($_.FullName.StartsWith($saveRootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $insideCheckedSave = $true
+                        break
+                    }
+                }
+                $insideCheckedSave
+            }
+        } |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 10)
 }
@@ -159,6 +177,29 @@ else {
     Add-PZTDiagFinding "OK" "Problem chunks" "No blam error files found in Saves/Multiplayer."
 }
 
+$hasMapChunkDownloadSignal = $false
+if ($latestDebugText) {
+    $hasMapChunkDownloadSignal = $latestDebugText -match "WorldStreamer|requestLargeAreaZip|Received\s+\d+\s*/\s*\d+\s+chunks|map download|download.*map|chunk.*download|CRC mismatch|SANITY CHECK FAIL|Error loading chunk"
+}
+if (-not $hasMapChunkDownloadSignal -and $blamFiles.Count -gt 0) {
+    $hasMapChunkDownloadSignal = $true
+}
+
+if ($hasMapChunkDownloadSignal) {
+    $profilesWithCache = New-Object System.Collections.Generic.List[string]
+    foreach ($profile in $profilesToCheck) {
+        if (-not $profile) { continue }
+        $saveName = Get-PZTProfileSaveName -SavesDir $paths.SavesDir -ProfileName $profile
+        $cacheDir = Join-Path $paths.SavesDir "${saveName}_player"
+        if (Test-Path -LiteralPath $cacheDir) {
+            $profilesWithCache.Add($profile) | Out-Null
+        }
+    }
+    if ($profilesWithCache.Count -gt 0) {
+        Add-PZTDiagFinding "Warning" "Hosted client cache" "Map/chunk download or problem-chunk signals were found. If the server save was just restored and hosting still hangs while loading/downloading map chunks, run reset-client-cache -WhatIf for the affected profile."
+    }
+}
+
 $latestWorkshopUpdateIssue = Get-PZTLatestWorkshopUpdateIssueFromText -Text $latestDebugText
 $latestWorkshopId = if ($latestWorkshopUpdateIssue) { $latestWorkshopUpdateIssue.WorkshopId } else { $null }
 $subscriptionFailure = Get-PZTWorkshopSubscriptionFailure -Text $latestDebugText
@@ -214,6 +255,7 @@ $result = [pscustomobject]@{
         LogPath = if ($latestDebug) { $latestDebug.FullName } else { $null }
     }
     LatestWorkshopSubscriptionFailure = $subscriptionFailure
+    MapChunkDownloadSignal = $hasMapChunkDownloadSignal
 }
 
 if ($Json) {
@@ -248,6 +290,7 @@ if ($lang -eq "es") {
     Write-Host "- Si Workshop update lock se repite y existe carpeta staged download, ejecuta primero repair-workshop -WhatIf."
     Write-Host "- Si Latest server log aparece como Warning, ejecuta latest-error incluyendo map logs."
     Write-Host "- Si Problem chunks aparece como Warning, ejecuta inspect-blam y prueba reparaciones solo en una copia."
+    Write-Host "- Si Hosted client cache aparece como Warning despues de restaurar un backup auto, prueba reset-client-cache -WhatIf antes de tocar el save servidor."
     Write-Host "- Si Profile health aparece como Warning, ejecuta health-check sobre el perfil afectado."
 }
 else {
@@ -258,5 +301,6 @@ else {
     Write-Host "- If Workshop update lock still repeats and a staged download folder exists, run repair-workshop -WhatIf first."
     Write-Host "- If Latest server log is Warning, run latest-error with map logs enabled."
     Write-Host "- If Problem chunks is Warning, run inspect-blam and test repairs only on a copied profile."
+    Write-Host "- If Hosted client cache is Warning after restoring a native auto-backup, try reset-client-cache -WhatIf before changing the server save."
     Write-Host "- If Profile health is Warning, run health-check for the affected profile."
 }

@@ -6,6 +6,8 @@
 - Added selective in-place restore from native PZ auto-backup ZIPs. The restore refuses profile-name mismatches, creates a toolkit safety backup first, supports `-WhatIf`, and never extracts global `Lua`, `mods`, unrelated `Server`, or unrelated `db` entries.
 - Added cached native auto-backup ZIP inspection under `cache/auto-backups/`, with `-NoCache` available for forced re-analysis.
 - Improved native auto-backup restore feedback with clearer long-step warnings, readme-based backup times, stronger Spanish text, and automatic post-restore health-check.
+- Clarified that native PZ auto-backup restore does not include hosted client cache `<profile>_player`, and added an explicit `reset-client-cache` tool for map/chunk loading hangs after diagnosis.
+- Updated quick diagnosis and health-check to surface map/chunk/client-cache signals without treating historical `blam` files as automatic save corruption.
 - Added a minimal JSONL action log under `logs/toolkit-actions.jsonl` for real native auto-backup restore completions, creating the foundation for broader toolkit action history.
 - Added detection for client-side Workshop subscription/access failures such as unnamed `0MB` mods, `GetItemState()=None`, `onItemNotSubscribed`, and `SubscribePending -> Fail`.
 - Updated quick diagnosis, latest-error, repair-workshop guardrails, docs, and smoke tests so removed/private/inaccessible Workshop items are not confused with staged redownload repair cases.

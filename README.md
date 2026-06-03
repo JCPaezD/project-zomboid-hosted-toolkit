@@ -154,7 +154,16 @@ Restore a native PZ auto-backup selectively to the same hosted profile:
 .\pz-toolkit.ps1 restore-auto-backup -BackupZip "C:/Users/you/Zomboid/backups/startup/backup_1.zip" -ProfileName "MyHostedServer" -Overwrite -ConfirmRestore
 ```
 
-This restore is intentionally in-place only. It restores the matching `Server/<profile>*`, `db/<profile>.db`, and `Saves/Multiplayer/<profile>/` entries from the ZIP. It does not extract global ZIP folders such as `Lua`, `mods`, unrelated `Server` entries, or unrelated `db` files. Do not close the terminal while a real restore is running. The real restore flow prints long-step warnings and runs a profile health-check when replacement finishes.
+This restore is intentionally in-place only. It restores the matching `Server/<profile>*`, `db/<profile>.db`, and `Saves/Multiplayer/<profile>/` entries from the ZIP. It does not extract global ZIP folders such as `Lua`, `mods`, unrelated `Server` entries, unrelated `db` files, or the local hosted-client cache folder `Saves/Multiplayer/<profile>_player`. Do not close the terminal while a real restore is running. The real restore flow prints long-step warnings and runs a profile health-check when replacement finishes.
+
+If a restored hosted save passes health-check but later hangs while downloading or loading map chunks, inspect logs first. When logs point at map/chunk download state rather than the server save itself, reset the local hosted-client cache explicitly:
+
+```powershell
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -WhatIf
+.\pz-toolkit.ps1 reset-client-cache -ProfileName "MyHostedServer" -ConfirmReset
+```
+
+This moves `<profile>_player` into a toolkit backup. It does not delete the server world or `players.db`, but it can affect local client-side cache/map state for the host.
 
 Inspect a hosted profile:
 
@@ -268,6 +277,7 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | `tools/pz-restore-profile.ps1` | Restore a profile backup to its original name or create a lab/fork copy under a new profile name. |
 | `tools/pz-export-profile.ps1` | Export `Mods`, `WorkshopItems`, `Map`, server settings, sandbox, Workshop checklist, and player CSV data. |
 | `tools/pz-clear-client-mods.ps1` | Back up and clear `Zomboid\mods\default.txt` so single-player active mods do not preload before Host. |
+| `tools/pz-reset-hosted-client-cache.ps1` | Move `<profile>_player` into a toolkit backup when stale hosted-client cache causes map/chunk loading problems. |
 | `tools/pz-reset-hosted-player.ps1` | Delete one row from `Saves\Multiplayer\<profile>\players.db.networkPlayers` after backup. |
 | `tools/pz-reset-hosted-world.ps1` | Move the selected profile's world/player/db out of the game so the next launch starts fresh. |
 | `tools/pz-compare-sandbox.ps1` | Compare simple key/value paths in two hosted `SandboxVars.lua` files, summarizing profile-only/mod sections by default. |
@@ -285,6 +295,7 @@ The interactive menu and profile/backup pickers use Up/Down plus Enter for norma
 | Backup and export | Writes only under toolkit `backups\` or `exports\` unless an explicit path is provided. |
 | Clear client mods | Supports `-WhatIf`; real direct-script operation requires `-ConfirmClear`. |
 | Restore/copy/reset | Supports `-WhatIf`; real direct-script operations require explicit confirmation flags such as `-ConfirmRestore`, `-ConfirmCopy`, or `-ConfirmReset`. |
+| Hosted client cache reset | Moves only `<profile>_player` after `-WhatIf` review and `-ConfirmReset`; does not touch the server save folder or `players.db`. |
 | Workshop repair | Narrow repair only; use `-WhatIf` first, close PZ/Steam helper processes before writing, and add `-ConfirmRepair` for the real operation. |
 
 ## Testing
