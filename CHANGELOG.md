@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0-alpha - 2026-06-04
 
 - Added read-only inspection for native Project Zomboid startup/version/period backup ZIPs, including progress feedback, IDs, readme metadata, profile content counts, comparison output, and global-state warnings.
 - Added selective in-place restore from native PZ auto-backup ZIPs. The restore refuses profile-name mismatches, creates a toolkit safety backup first, supports `-WhatIf`, and never extracts global `Lua`, `mods`, unrelated `Server`, or unrelated `db` entries.
