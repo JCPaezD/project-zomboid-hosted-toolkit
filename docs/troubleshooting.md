@@ -87,6 +87,40 @@ Use:
 
 This does not unsubscribe from Workshop items. It clears the global client preload list.
 
+## Client JVM Heap Is Too Low
+
+In hosted/co-op games, the host can run both the playable Project Zomboid client and a separate hosted server process. Increasing memory in the Host server settings does not necessarily increase the client's Java heap.
+
+Common symptoms:
+
+- the host or one client develops severe stutter after playing for a while, while other players continue normally;
+- the server keeps running or other players can still play;
+- logs show `OutOfMemoryError`, `Java heap space`, `Core.TakeScreenshot`, or failures while creating thumbnails or zipping logs.
+
+First checks:
+
+1. Inspect the affected machine's latest `Zomboid\Logs\*_DebugLog.txt`, not only `*_DebugLog-server.txt`.
+2. Near the start of the log, check `JVM (... max: <n> Mb ...)`.
+3. Compare that value with the hosted server memory setting or server Java command line if available.
+4. If the client heap is still around `3072 Mb`, consider raising it modestly and retesting before changing saves, chunks, or mods.
+
+On Steam installs, the client JVM argument is commonly in the Project Zomboid install folder:
+
+```text
+ProjectZomboid64.json
+```
+
+If launching through `.bat` files, check those launchers too. Steam Launch Options may not pass JVM arguments to the Java process, depending on how the game is launched.
+
+Practical guidance:
+
+- choose a conservative value first, such as 4 GB for moderate packs or 6 GB for large packs, then verify the next log;
+- leave enough system RAM for Windows, Steam, the hosted server process, graphics resources, and other applications;
+- Steam file verification or game updates may restore launcher files, so re-check after updates;
+- changing client heap does not modify server profiles, saves, `players.db`, or Workshop subscriptions.
+
+Do not treat client memory pressure as save corruption by itself. If heap changes do not help, continue with log-based diagnosis for client cache, map/chunk loading, Workshop, or mod-specific errors.
+
 ## Problem Chunks / blam Folder
 
 Build 42 may move chunks that failed to load into a save-local `blam` folder. Typical signals:
